@@ -2,7 +2,7 @@
 
 **⚠️ WICHTIG: KEINE DATEN IN DAS REPOSITORY ÜBERTRAGEN.**
 
-Dieses Verzeichnis ist so konfiguriert, dass alle Dateien (außer dieser README) von Git ignoriert werden. Sie bleiben also rein lokal auf deinem Rechner.
+Dieses Verzeichnis ist so konfiguriert, dass alle Dateien (außer dieser README und dem `typology/` Ordner) von Git ignoriert werden. Sie bleiben also rein lokal auf deinem Rechner.
 
 ## Anleitung zur Einrichtung
 1. Lade den geteilten Datensatz von Moodle herunter.
@@ -15,6 +15,7 @@ Dein lokaler Ordner sollte am Ende so aussehen, damit die Skripte reibungslos fu
 - `data/Literatur/`
 - `data/png/`
 - `data/svg/`
+- `data/typology/`
 - `data/Gesamt_DB_export.xlsx`
 - `data/README.md`
 
