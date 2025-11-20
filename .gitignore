@@ -1,4 +1,6 @@
-data
+data/*
+!data/README.md
+!data/typology/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
