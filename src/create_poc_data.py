@@ -1,4 +1,4 @@
-"""Create subset of the original data to use as a PoC."""
+"""Create a subset of the original data to use for a PoC."""
 
 import shutil
 from pathlib import Path
@@ -11,8 +11,10 @@ TYPES = ["Drag. 32", "Drag. 33", "Drag. 37", "Drag. 18/31"]
 
 def main():
 
+    # Create the PoC directory.
     Path("data/PoC").mkdir(parents=True, exist_ok=True)
 
+    # load the excel file and rename the columns just to make the code more readable.
     df = pd.read_excel("data/Gesamt_DB_export.xlsx")
     df.columns = df.columns.str.replace('Sample.', '', regex=False)
 
@@ -28,7 +30,7 @@ def main():
 
         dst_folder = Path(f"data/PoC/{folder_path}")
 
-        # Delete any existing data.
+        # Delete any previous data.
         if dst_folder.exists():
             shutil.rmtree(dst_folder)
 
