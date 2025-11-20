@@ -30,3 +30,7 @@ Dadurch aktualisiert Poetry automatisch die pyproject.toml und poetry.lock und w
 Folgenden Interpreter auswählen (VS Code: Ctrl+Shift+P -> Select Interpreter):
  - Windows: .venv\Scripts\python.exe
  - macOS: .venv/bin/python
+
+## Data Setup
+
+Aus Datenschutzgründen ist der Datensatz nicht direkt in diesem Repo enthalten. Folge den Anweisungen in [data/README.md](data/README.md), um die benötigten Daten korrekt und lokal einzurichten.
