@@ -55,7 +55,6 @@ def build_siamese_network(inputShape, embeddingDim=200):
     return model
 
 
-
 if __name__ == "__main__":
     images, labels = get_data()
     preprocess_data(images, labels)

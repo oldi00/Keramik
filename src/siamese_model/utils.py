@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 import numpy as np
+import tensorflow.keras.backend as K
 
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -48,7 +49,11 @@ def make_pairs(images, labels):
 
 
 def euclidean_distance(vectors):
-    pass
+    feats_img1, feats_img2 = vectors
+
+    sum_squared = K.sum(K.square(feats_img1 - feats_img2), axis=1, keepdims=True)
+
+    return K.sqrt(K.maximum(sum_squared, K.epsilon()))
 
 def test():
     result = make_pairs(np.array(["img_A", "img_B", "img_C", "img_D", "img_E"]), np.array([0, 1, 0, 2, 1]))
