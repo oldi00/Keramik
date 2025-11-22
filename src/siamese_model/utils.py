@@ -19,15 +19,14 @@ def clean_svg(src_path, dst_path):
 
 
 def make_pairs(images, labels):
+    images = np.array(images)
+    labels = np.array(labels)
+
     pair_images = []
     pair_labels = []
 
     num_classes = len(np.unique(labels))
     idx = [np.where(labels == i)[0] for i in range(0, num_classes)]
-
-    print(pair_images)
-    print(pair_labels)
-    print(idx)
 
     for i in range(len(images)):
         current_img = images[i]
@@ -48,10 +47,13 @@ def make_pairs(images, labels):
     return (np.array(pair_images), np.array(pair_labels))
 
 
+def euclidean_distance(vectors):
+    pass
+
 def test():
     result = make_pairs(np.array(["img_A", "img_B", "img_C", "img_D", "img_E"]), np.array([0, 1, 0, 2, 1]))
 
     print(result)
 
-
-test()
+if __name__ == "__main__":
+    test()
