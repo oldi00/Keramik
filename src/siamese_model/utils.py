@@ -1,74 +1,105 @@
-import xml.etree.ElementTree as ET
 import numpy as np
-import tensorflow.keras.backend as K
-import tensorflow as tf
-
-SVG_NS = "http://www.w3.org/2000/svg"
-
-
-def clean_svg(src_path, dst_path):
-    """Removes ID and scale from the given SVG image."""
-    tree = ET.parse(src_path)
-    root = tree.getroot()
-    for child in list(root):
-        if child.tag in [f"{SVG_NS}text", f"{SVG_NS}rect"]:
-            root.remove(child)
-    tree.write(dst_path)
+import cairosvg
+import io
+from model import IMG_SIZE
+from PIL import Image
+from pathlib import Path
 
 
-def load_image(path):
-    """Lädt ein Bild, konvertiert es zu Grayscale und resized es."""
-    # WICHTIG: Path-Objekt zu String konvertieren für TF
-    path = str(path)
-    img = tf.io.read_file(path)
-    img = tf.image.decode_png(img, channels=1)
-    img = tf.image.convert_image_dtype(img, tf.float32)
-    img = tf.image.resize(img, (128, 128))
-    return img.numpy()
+def process_svg(path):
+    """Konvertiert SVG zu normalisiertem Numpy Array (128,128,1)"""
+    try:
+        # SVG rendern (groß für Qualität)
+        png_bytes = cairosvg.svg2png(
+            url=str(path), write_to=None, output_width=512, output_height=512
+        )
+        img = Image.open(io.BytesIO(png_bytes)).convert("RGBA")
+
+        # Resizing
+        img.thumbnail(IMG_SIZE, Image.Resampling.LANCZOS)
+
+        # Weißer Hintergrund
+        background = Image.new("RGB", IMG_SIZE, (255, 255, 255))
+
+        # Zentrieren
+        offset_x = (IMG_SIZE[0] - img.width) // 2
+        offset_y = (IMG_SIZE[1] - img.height) // 2
+        background.paste(img, (offset_x, offset_y), mask=img.split()[3])
+
+        # Normalisieren & Grayscale
+        arr = np.array(background.convert("L")).astype("float32") / 255.0
+        return np.expand_dims(arr, axis=-1)
+    except Exception as e:
+        print(f"Error processing {path}: {e}")
+        return None
+
+
+def load_data(root_dir="data/PoC"):
+    """Lädt alle SVGs und Labels"""
+    X = []
+    y = []
+    data_path = Path(root_dir)
+
+    # Klassen finden
+    class_names = sorted([item.name for item in data_path.iterdir() if item.is_dir()])
+    class_map = {name: idx for idx, name in enumerate(class_names)}
+
+    files = list(data_path.rglob("*.svg"))
+    print(f"Found {len(files)} SVGs.")
+
+    for file_path in files:
+        img_data = process_svg(file_path)
+        if img_data is not None:
+            X.append(img_data)
+            parent_folder = file_path.parent.name
+            if parent_folder in class_map:
+                y.append(class_map[parent_folder])
+            else:
+                y.append(0)  # Fallback
+
+    return np.array(X), np.array(y)
 
 
 def make_pairs(images, labels):
-    """Erstellt Paare (Positive/Negative) im Speicher."""
-    # Sicherstellen, dass wir listenartige Strukturen haben
-    images = np.array(images)
-    labels = np.array(labels)
-
-    pair_images = []
+    """Erstellt 50/50 Positive/Negative Paare"""
+    images_left = []
+    images_right = []
     pair_labels = []
 
-    # Indexlisten für jede Klasse ermitteln
     unique_classes = np.unique(labels)
-    idx = [np.where(labels == i)[0] for i in unique_classes]
-
-    print(f"Generiere Paare aus {len(images)} Bildern...")
+    idx = {i: np.where(labels == i)[0] for i in unique_classes}
 
     for i in range(len(images)):
-        current_img = load_image(images[i])
+        current_img = images[i]
         label = labels[i]
 
-        # 1. Positives Paar (Gleiche Klasse)
-        # idx[label] enthält alle Indizes dieser Klasse
-        # Wir müssen sicherstellen, dass der Index im Array bounds ist
-        current_class_indices = idx[label]
-        j = np.random.choice(current_class_indices)
-        pos_img = load_image(images[j])
+        # 1. Positive Pair
+        class_indices = idx[label]
+        if len(class_indices) > 1:
+            possible = class_indices[class_indices != i]
+            pos_idx = np.random.choice(possible)
+        else:
+            pos_idx = class_indices[0]
 
-        pair_images.append([current_img, pos_img])
-        pair_labels.append([1])
+        images_left.append(current_img)
+        images_right.append(images[pos_idx])
+        pair_labels.append(1.0)
 
-        # 2. Negatives Paar (Andere Klasse)
-        neg_idx = np.where(labels != label)[0]
-        if len(neg_idx) > 0:  # Nur wenn es andere Klassen gibt
-            k = np.random.choice(neg_idx)
-            neg_img = load_image(images[k])
+        # 2. Negative Pair
+        neg_indices = np.where(labels != label)[0]
+        if len(neg_indices) > 0:
+            neg_idx = np.random.choice(neg_indices)
+            images_left.append(current_img)
+            images_right.append(images[neg_idx])
+            pair_labels.append(0.0)
 
-            pair_images.append([current_img, neg_img])
-            pair_labels.append([0])
+    left_arr = np.array(images_left)
+    right_arr = np.array(images_right)
+    lbl_arr = np.array(pair_labels).astype("float32")
 
-    return np.array(pair_images), np.array(pair_labels)
-
-
-def euclidean_distance(vectors):
-    feats_img1, feats_img2 = vectors
-    sum_squared = K.sum(K.square(feats_img1 - feats_img2), axis=1, keepdims=True)
-    return K.sqrt(K.maximum(sum_squared, K.epsilon()))
+    shuffle_indices = np.random.permutation(len(lbl_arr))
+    return (
+        left_arr[shuffle_indices],
+        right_arr[shuffle_indices],
+        lbl_arr[shuffle_indices],
+    )
