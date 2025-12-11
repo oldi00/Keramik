@@ -3,20 +3,20 @@
 import tensorflow as tf
 import numpy as np
 import tensorflow.keras.backend as K
+import cairosvg
+import io
+import matplotlib.pyplot as plt
 from pathlib import Path
 from keras.layers import Lambda, Flatten, Dense, Input, Conv2D, MaxPooling2D, Dropout
 from keras.models import Model, Sequential
 from keras.optimizers import Adam
-import cairosvg
-import io
 from PIL import Image
-import matplotlib.pyplot as plt
 
 
 MODEL_INPUT_SHAPE = (128, 128, 1)
 IMG_SIZE = (128, 128)
 BATCH_SIZE = 16
-EPOCHS = 30
+EPOCHS = 15
 
 
 def process_svg(path):
@@ -61,6 +61,35 @@ def load_data(root_dir="data/PoC"):
             else:
                 y.append(0)
     return np.array(X), np.array(y)
+
+
+def find_bad_images(root_dir="data/PoC"):
+    print("--- Scanning for corrupted/empty images ---")
+    data_path = Path(root_dir)
+    files = list(data_path.rglob("*.svg"))
+
+    issues_found = 0
+
+    for file_path in files:
+        # Process the image
+        img_data = process_svg(file_path)
+
+        if img_data is None:
+            continue
+
+        if np.std(img_data) < 0.01:
+            print(f"⚠️  BAD FILE FOUND: {file_path.name}")
+            print(f"    (Folder: {file_path.parent.name})")
+            issues_found += 1
+
+    if issues_found == 0:
+        print("✅ No empty images found. The data looks clean!")
+    else:
+        print(f"❌ Found {issues_found} problematic files.")
+
+
+# Run the cleaner
+# find_bad_images()
 
 
 def make_pairs(images, labels):
@@ -175,7 +204,9 @@ if __name__ == "__main__":
     optimizer = Adam(learning_rate=0.0001)
     model.compile(loss="binary_crossentropy", optimizer=optimizer, metrics=["accuracy"])
 
-    print("\nStarting Training (No L2 Regularization)...")
+    print("\nStarting Training")
+    model.summary()
+
     history = model.fit(
         [images_L, images_R],
         pair_labels,
