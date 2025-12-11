@@ -15,6 +15,8 @@ DIR_SHARDS_PROFILES = Path("data/preprocess/shards_profiles")
 DIR_TYP_SKELETONS = Path("data/preprocess/typology_skeletons")
 DIR_TYP_CROPS = Path("data/preprocess/typology_crops")
 
+# todo: return white lines on black background (+ fix get_points in utils.py)
+
 
 def clean_shard(img_path, output_dir):
     """Removes ID and scale from the raw SVG image."""

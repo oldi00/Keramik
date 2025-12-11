@@ -1,6 +1,7 @@
 """A collection of utility functions."""
 
 import shutil
+import cv2
 from pathlib import Path
 
 
@@ -25,3 +26,15 @@ def create_dir(path, override=False):
     if path.exists() and safe_to_delete(path) and override:
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
+
+
+def get_points(img_path):
+    """Returns a list of points of all black pixels."""
+
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    img = cv2.bitwise_not(img)  # switch black/white pixels
+
+    points = cv2.findNonZero(img)
+    points = points.squeeze()  # removes axes of length=1
+
+    return points
