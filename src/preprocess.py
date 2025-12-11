@@ -36,11 +36,12 @@ def clean_shard(img_path, output_dir):
 def convert_svg2png(img_path, output_dir):
     """Converts the given SVG file to PNG format."""
 
-    drawing = svg2rlg(str(img_path))
-
-    out_path = output_dir / f"{img_path.stem}.png"
-
-    renderPM.drawToFile(drawing, out_path, fmt="PNG", dpi=300)
+    try:
+        drawing = svg2rlg(str(img_path))
+        out_path = output_dir / f"{img_path.stem}.png"
+        renderPM.drawToFile(drawing, out_path, fmt="PNG", dpi=300)
+    except Exception as e:
+        print(f"\n[SKIP] Could not convert {img_path.name}: {e}")
 
 
 def extract_profile_shard(img_path, output_dir):
@@ -104,7 +105,7 @@ def preprocess_shards(debug=False):
 
     # Create the necessary folders to store the processed images.
     for dir_path in [DIR_SHARDS_CLEAN_SVG, DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES]:
-        create_dir(dir_path, override=True)
+        create_dir(dir_path, override=False)
 
     # Remove non-relevant artifacts (IDs, scale) from raw SVGs so the model can focus on geometry.
     for svg_path in tqdm(list(Path("data/raw/svg").iterdir()), desc="Clean Shards", unit="img"):
@@ -112,15 +113,16 @@ def preprocess_shards(debug=False):
         if debug:
             break
 
-    # Transform clean SVGs to PNG format since it is easier to work with later.
-    for svg_path in tqdm(list(DIR_SHARDS_CLEAN_SVG.iterdir()), desc="Convert SVGs", unit="img"):
-        convert_svg2png(svg_path, DIR_SHARDS_CLEAN_PNG)
+    # Rename the clean shards for easier identification later.
+    for file in DIR_SHARDS_CLEAN_SVG.iterdir():
+        file.replace(file.with_name(file.name.replace("recons_", "")))
         if debug:
             break
 
-    # Rename the processed shards for easier identification.
-    for file in DIR_SHARDS_CLEAN_PNG.iterdir():
-        file.rename(file.with_name(file.name.replace("recons_", "")))
+    # Transform clean SVGs to PNG format since it is easier to work with later.
+    for svg_path in tqdm(list(DIR_SHARDS_CLEAN_SVG.iterdir()), desc="Convert SVGs", unit="img"):
+        if not (DIR_SHARDS_CLEAN_PNG / f"{svg_path.stem}.png").exists():
+            convert_svg2png(svg_path, DIR_SHARDS_CLEAN_PNG)
         if debug:
             break
 
@@ -153,5 +155,5 @@ def preprocess_typology(debug=False):
 
 
 if __name__ == "__main__":
-    preprocess_shards(debug=True)
+    preprocess_shards(debug=False)
     preprocess_typology(debug=False)
