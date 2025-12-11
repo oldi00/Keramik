@@ -1,6 +1,6 @@
 """Cleans and extracts geometric profiles from raw shard and typology scans."""
 
-from src.utils import create_dir
+from utils import create_dir
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET

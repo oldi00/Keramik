@@ -1,6 +1,6 @@
 """A collection of visualization functions."""
 
-from src.preprocess import DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES, \
+from preprocess import DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES, \
     DIR_TYP_SKELETONS, DIR_TYP_CROPS
 import cv2
 from matplotlib import pyplot as plt
