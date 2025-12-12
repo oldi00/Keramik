@@ -1,8 +1,15 @@
 """A collection of utility functions."""
 
+import re
 import shutil
 import cv2
 from pathlib import Path
+
+
+def normalize_name(text):
+    """Returns the normalized form of the given text."""
+
+    return re.sub(r'[^a-z0-9]', '', text.lower())
 
 
 def safe_to_delete(dir_path):
@@ -35,7 +42,7 @@ def get_points(img_path):
     img = cv2.bitwise_not(img)  # switch black/white pixels
 
     points = cv2.findNonZero(img)
-    points = points.squeeze()  # removes axes of length=1
+    points = points.reshape(-1, 2)
 
     return points
 
