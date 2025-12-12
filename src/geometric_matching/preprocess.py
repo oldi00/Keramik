@@ -9,13 +9,19 @@ from tqdm import tqdm
 from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPM
 
+# Enable this option if all preprocessing directories should be deleted and re-generated
+# from scratch. This is useful for major changes. Otherwise, existing files will remain unchanged.
+OVERRIDE = False
+
+# Enable this option to only process a single shard and typology image.
+# This is useful for testing the pipeline.
+DEBUG = False
+
 DIR_SHARDS_CLEAN_SVG = Path("data/preprocess/shards_clean_svg")
 DIR_SHARDS_CLEAN_PNG = Path("data/preprocess/shards_clean_png")
 DIR_SHARDS_PROFILES = Path("data/preprocess/shards_profiles")
 DIR_TYP_SKELETONS = Path("data/preprocess/typology_skeletons")
 DIR_TYP_CROPS = Path("data/preprocess/typology_crops")
-
-# todo: return white lines on black background (+ fix get_points in utils.py)
 
 
 def clean_shard(img_path, output_dir):
@@ -102,60 +108,67 @@ def crop_typology(img_path, output_dir):
     cv2.imwrite(out_path, crop)
 
 
-def preprocess_shards(debug=False):
+def preprocess_shards():
     """Cleans and standardizes raw shards for model training."""
 
     # Create the necessary folders to store the processed images.
     for dir_path in [DIR_SHARDS_CLEAN_SVG, DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES]:
-        create_dir(dir_path, override=False)
+        create_dir(dir_path, override=OVERRIDE)
 
     # Remove non-relevant artifacts (IDs, scale) from raw SVGs so the model can focus on geometry.
     for svg_path in tqdm(list(Path("data/raw/svg").iterdir()), desc="Clean Shards", unit="img"):
         clean_shard(svg_path, DIR_SHARDS_CLEAN_SVG)
-        if debug:
+        if DEBUG:
             break
 
     # Rename the clean shards for easier identification later.
     for file in DIR_SHARDS_CLEAN_SVG.iterdir():
         file.replace(file.with_name(file.name.replace("recons_", "")))
-        if debug:
+        if DEBUG:
             break
 
     # Transform clean SVGs to PNG format since it is easier to work with later.
     for svg_path in tqdm(list(DIR_SHARDS_CLEAN_SVG.iterdir()), desc="Convert SVGs", unit="img"):
         if not (DIR_SHARDS_CLEAN_PNG / f"{svg_path.stem}.png").exists():
             convert_svg2png(svg_path, DIR_SHARDS_CLEAN_PNG)
-        if debug:
+        if DEBUG:
             break
 
     # Extract the profile (left side) from each shard.
     shard_paths = list(DIR_SHARDS_CLEAN_PNG.iterdir())
     for shard_path in tqdm(shard_paths, desc="Extract Shard Profiles", unit="img"):
         extract_profile_shard(shard_path, DIR_SHARDS_PROFILES)
-        if debug:
+        if DEBUG:
             break
 
 
-def preprocess_typology(debug=False):
+def preprocess_typology():
     """Cleans and standardizes typology snapshots for model training."""
 
     # Create the necessary folders to store the processed images.
     for dir_path in [DIR_TYP_SKELETONS, DIR_TYP_CROPS]:
-        create_dir(dir_path, override=True)
+        create_dir(dir_path, override=OVERRIDE)
 
     # Compute the skeleton to get clean, single-pixel geometric paths.
-    for typ_path in tqdm(list(Path("data/typology").iterdir()), desc="Get Skeletons", unit="img"):
+    typ_paths = [p for p in Path("data/typology/modelle").rglob("*") if p.is_file()]
+    for typ_path in tqdm(typ_paths, desc="Get Skeletons", unit="img"):
+
+        # ! temporary fix
+        umlauts = ['ä', 'ö', 'ü', 'Ä', 'Ö', 'Ü', 'ß']
+        if typ_path.name.startswith(".") or any(x in typ_path.name for x in umlauts):
+            continue
+
         get_skeleton(typ_path, DIR_TYP_SKELETONS)
-        if debug:
+        if DEBUG:
             break
 
     # Crop the typology images since only the upper-left side is relevant.
     for typ_path in tqdm(list(DIR_TYP_SKELETONS.iterdir()), desc="Crop Typology", unit="img"):
         crop_typology(typ_path, DIR_TYP_CROPS)
-        if debug:
+        if DEBUG:
             break
 
 
 if __name__ == "__main__":
-    preprocess_shards(debug=False)
-    preprocess_typology(debug=False)
+    preprocess_shards()
+    preprocess_typology()
