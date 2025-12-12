@@ -38,3 +38,13 @@ def get_points(img_path):
     points = points.squeeze()  # removes axes of length=1
 
     return points
+
+
+def get_dist_map(img_path):
+    """Loads an image and returns the distance map. Assumes the image is binarized."""
+
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+
+    dist_map = cv2.distanceTransform(img, cv2.DIST_L2, 5)
+
+    return dist_map

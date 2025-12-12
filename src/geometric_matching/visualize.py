@@ -2,6 +2,7 @@
 
 from preprocess import DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES, \
     DIR_TYP_SKELETONS, DIR_TYP_CROPS
+from utils import get_dist_map
 import cv2
 from matplotlib import pyplot as plt
 
@@ -50,6 +51,20 @@ def show_preprocess_typology(typ_name):
     plt.show()
 
 
+def show_dist_map(img_path):
+    """Visualize the distance map of the given image."""
+
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    show_img("Original", img, (1, 2, 1))
+
+    dist_map = get_dist_map(img_path)
+    show_img("Distance Map", dist_map, (1, 2, 2))
+
+    plt.tight_layout()
+    plt.show()
+
+
 if __name__ == "__main__":
-    show_preprocess_shards("10001")
-    show_preprocess_typology("Drag33")
+    # show_preprocess_shards("10001")
+    # show_preprocess_typology("Drag33")
+    show_dist_map("data/preprocess/typology_crops/Drag33.png")
