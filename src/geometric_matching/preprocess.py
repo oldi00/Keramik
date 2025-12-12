@@ -17,9 +17,11 @@ OVERRIDE = False
 # This is useful for testing the pipeline.
 DEBUG = False
 
+DIR_SHARDS_RAW = Path("data/raw/svg")
 DIR_SHARDS_CLEAN_SVG = Path("data/preprocess/shards_clean_svg")
 DIR_SHARDS_CLEAN_PNG = Path("data/preprocess/shards_clean_png")
 DIR_SHARDS_PROFILES = Path("data/preprocess/shards_profiles")
+DIR_TYPOLOGY_RAW = Path("data/poc")
 DIR_TYP_SKELETONS = Path("data/preprocess/typology_skeletons")
 DIR_TYP_CROPS = Path("data/preprocess/typology_crops")
 
@@ -82,7 +84,9 @@ def get_skeleton(img_path, output_dir):
 
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
-    _, binary = cv2.threshold(img, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    blurred = cv2.GaussianBlur(img, (5, 5), 0)
+
+    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     skeleton = cv2.ximgproc.thinning(binary, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
 
@@ -116,7 +120,7 @@ def preprocess_shards():
         create_dir(dir_path, override=OVERRIDE)
 
     # Remove non-relevant artifacts (IDs, scale) from raw SVGs so the model can focus on geometry.
-    for svg_path in tqdm(list(Path("data/raw/svg").iterdir()), desc="Clean Shards", unit="img"):
+    for svg_path in tqdm(list(DIR_SHARDS_RAW.iterdir()), desc="Clean Shards", unit="img"):
         clean_shard(svg_path, DIR_SHARDS_CLEAN_SVG)
         if DEBUG:
             break
@@ -150,7 +154,7 @@ def preprocess_typology():
         create_dir(dir_path, override=OVERRIDE)
 
     # Compute the skeleton to get clean, single-pixel geometric paths.
-    typ_paths = [p for p in Path("data/typology/modelle").rglob("*") if p.is_file()]
+    typ_paths = [p for p in DIR_TYPOLOGY_RAW.rglob("*") if p.is_file()]
     for typ_path in tqdm(typ_paths, desc="Get Skeletons", unit="img"):
 
         # ! temporary fix
