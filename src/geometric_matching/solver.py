@@ -13,8 +13,8 @@ MAX_ROTATION = np.deg2rad(20)
 
 def get_transformation(p1, p2, q1, q2):
     """
-    Calculates the transformation to map the shard
-    points (p1, p2) onto the typology points (q1, q2).
+    Calculates the affine transformation (scale, rotation, translation) needed to
+    map two shard points (p1, p2) onto two typology points (q1, q2).
     """
 
     vec_p = p2 - p1
@@ -23,15 +23,19 @@ def get_transformation(p1, p2, q1, q2):
     len_s = np.linalg.norm(vec_p)
     len_q = np.linalg.norm(vec_q)
 
+    # Compute the ratio to resize the shard so it matches the
+    # physical scale of the reference typology.
     scale = len_q / len_s
 
     angle_p = np.arctan2(vec_p[1], vec_p[0])
     angle_q = np.arctan2(vec_q[1], vec_q[0])
 
+    # Determine the angle needed to align the shard's orientation with the typology.
     rotation = angle_q - angle_p
 
     cos, sin = np.cos(rotation), np.sin(rotation)
 
+    # Calculate the translation to shift the shard so that p1 exactly overlaps with q1.
     t_x = q1[0] - (scale * (p1[0] * cos - p1[1] * sin))
     t_y = q1[1] - (scale * (p1[0] * sin + p1[1] * cos))
 
@@ -46,6 +50,8 @@ def apply_transformation(points, scale, rotation, translation):
 
     cos, sin = np.cos(rotation), np.sin(rotation)
 
+    # Transform all shard points. Apply scale and rotation
+    # first, then translate to the new position.
     x = (scale * (p_x * cos - p_y * sin)) + t_x
     y = (scale * (p_x * sin + p_y * cos)) + t_y
 
