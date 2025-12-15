@@ -35,14 +35,18 @@ def create_dir(path, override=False):
     path.mkdir(parents=True, exist_ok=True)
 
 
-def get_points(img_path):
-    """Returns a list of points of all black pixels."""
+def get_points(img_path, step=5):
+    """Returns a list of points of black pixels, downsampled for speed."""
 
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     img = cv2.bitwise_not(img)  # switch black/white pixels
 
     points = cv2.findNonZero(img)
     points = points.reshape(-1, 2)
+
+    # Choose only every n-th point. This keeps the shape, but
+    # reduces the necessary computational resources later.
+    points = points[::step]
 
     return points
 

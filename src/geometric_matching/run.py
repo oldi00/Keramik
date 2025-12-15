@@ -8,6 +8,7 @@ from solver import solve_matching
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 
 EXCEL_PATH = "data/raw/Gesamt_DB_export.xlsx"
@@ -72,6 +73,17 @@ def load_ground_truth_typology():
     return typology
 
 
+def process_single_match(typ_name, typ_data, points_shard):
+    """
+    Executes a single matching computation and packages the result
+    with the typology name for parallel processing.
+    """
+
+    score, params = solve_matching(points_shard, typ_data["points"], typ_data["dist_map"])
+
+    return {"typ_name": typ_name, "score": score, "params": params}
+
+
 def main():
 
     test_set = load_test_set_from_excel()
@@ -86,11 +98,12 @@ def main():
 
             points_shard = get_points(shard["path"])
 
-            results = []
-            for typ_name, typ_data in typology.items():
-                points_typ, dist_map = typ_data["points"], typ_data["dist_map"]
-                score, params = solve_matching(points_shard, points_typ, dist_map)
-                results.append({"typ_name": typ_name, "score": score, "params": params})
+            # Compare the shard points with all typology references in parallel
+            # by using multiple CPU kernels to speed up computation.
+            results = Parallel(n_jobs=-1)(
+                delayed(process_single_match)(name, data, points_shard)
+                for name, data in typology.items()
+            )
 
             # Sort by ascending score because Chamfer Distance measures error.
             # This means 0 is a perfect match.
