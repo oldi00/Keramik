@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from tqdm import tqdm
 from svglib.svglib import svg2rlg
-from reportlab.graphics import renderPM
 
 # Enable this option if all preprocessing directories should be deleted and re-generated
 # from scratch. This is useful for major changes. Otherwise, existing files will remain unchanged.
@@ -46,7 +45,10 @@ def clean_shard(img_path, output_dir):
 def convert_svg2png(img_path, output_dir):
     """Converts the given SVG file to PNG format."""
 
+    out_path = output_dir / f"{img_path.stem}.png"
+
     try:
+        from reportlab.graphics import renderPM
         drawing = svg2rlg(str(img_path))
         out_path = output_dir / f"{img_path.stem}.png"
         renderPM.drawToFile(drawing, out_path, fmt="PNG", dpi=300)
