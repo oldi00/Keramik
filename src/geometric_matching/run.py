@@ -3,8 +3,9 @@ PoC pipeline for classifying shards by geometrically matching
 them against reference typologies using RANSAC and Chamfer distance.
 """
 
-from utils import get_points, get_dist_map, normalize_name
-from solver import solve_matching
+from utils import get_points, get_dist_map, normalize_name, create_dir
+from visualize import save_heatmap_overlay
+from solver import solve_matching, apply_transformation
 import pandas as pd
 from pathlib import Path
 from tqdm import tqdm
@@ -89,6 +90,11 @@ def main():
     test_set = load_test_set_from_excel()
     typology = load_ground_truth_typology()
 
+    out_dir_correct = Path("data/results/correct")
+    out_dir_wrong = Path("data/results/wrong")
+    create_dir(out_dir_correct, override=True)
+    create_dir(out_dir_wrong, override=True)
+
     top_1, top_3 = 0, 0
     with tqdm(test_set, unit="shard") as bar:
 
@@ -122,6 +128,17 @@ def main():
             curr_acc1 = top_1 / idx
             curr_acc3 = top_3 / idx
             bar.set_postfix({"Top-1": f"{curr_acc1:.2%}", "Top-3": f"{curr_acc3:.2%}"})
+
+            points_shard = get_points(shard["path"], step=1)
+            out_dir = out_dir_correct if is_top1 else out_dir_wrong
+
+            heatmap_config = {
+                "typ_path": typology[results[0]["typ_name"]]["path"],
+                "dist_map": typology[results[0]["typ_name"]]["dist_map"],
+                "points": apply_transformation(points_shard, *results[0]["params"]),
+                "out_path": out_dir / f"{shard["id"]}.png"
+            }
+            save_heatmap_overlay(**heatmap_config)
 
     print("-" * 30)
     print(f"Final Top-1 Accuracy: {top_1 / len(test_set):.2%}")
