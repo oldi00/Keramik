@@ -3,6 +3,7 @@
 import re
 import shutil
 import cv2
+import yaml
 from pathlib import Path
 
 
@@ -10,6 +11,19 @@ def normalize_name(text):
     """Returns the normalized form of the given text."""
 
     return re.sub(r'[^a-z0-9]', '', text.lower())
+
+
+def load_config(config_path="config.yaml"):
+    """Load a config file based on the given path."""
+
+    with open(config_path, "r") as file:
+        config = yaml.safe_load(file)
+
+    # Convert strings to Path objects automatically.
+    for key, val in config['paths'].items():
+        config['paths'][key] = Path(val)
+
+    return config
 
 
 def safe_to_delete(dir_path):
