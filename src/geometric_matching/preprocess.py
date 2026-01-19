@@ -1,12 +1,19 @@
-"""Cleans and extracts geometric profiles from raw shard and typology scans."""
+"""Clean and extract geometric profiles from raw shard and typology scans."""
 
 from utils import create_dir
+import logging
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from tqdm import tqdm
-from svglib.svglib import svg2rlg
+import cairosvg
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 # Enable this option if all preprocessing directories should be deleted and re-generated
 # from scratch. This is useful for major changes. Otherwise, existing files will remain unchanged.
@@ -20,13 +27,13 @@ DIR_SHARDS_RAW = Path("data/raw/svg")
 DIR_SHARDS_CLEAN_SVG = Path("data/preprocess/shards_clean_svg")
 DIR_SHARDS_CLEAN_PNG = Path("data/preprocess/shards_clean_png")
 DIR_SHARDS_PROFILES = Path("data/preprocess/shards_profiles")
-DIR_TYPOLOGY_RAW = Path("data/poc")
-DIR_TYP_SKELETONS = Path("data/preprocess/typology_skeletons")
-DIR_TYP_CROPS = Path("data/preprocess/typology_crops")
+DIR_TYPO_RAW = Path("data/poc")
+DIR_TYPO_SKELETONS = Path("data/preprocess/typology_skeletons")
+DIR_TYPO_CROPS = Path("data/preprocess/typology_crops")
 
 
-def clean_shard(img_path, output_dir):
-    """Removes ID and scale from the raw SVG image."""
+def clean_shard(img_path: Path, output_dir: Path) -> None:
+    """Remove ID and scale from the raw SVG image."""
 
     namespace = "{http://www.w3.org/2000/svg}"
 
@@ -42,22 +49,23 @@ def clean_shard(img_path, output_dir):
     tree.write(output_path)
 
 
-def convert_svg2png(img_path, output_dir):
-    """Converts the given SVG file to PNG format."""
+def convert_svg2png(img_path: Path, output_dir: Path) -> None:
+    """
+    Convert the given SVG image to PNG format.
+    Follow instruction on CairoSVG website (https://cairosvg.org/) to
+    ensure this functions works with no issues.
+    """
 
     out_path = output_dir / f"{img_path.stem}.png"
 
     try:
-        from reportlab.graphics import renderPM
-        drawing = svg2rlg(str(img_path))
-        out_path = output_dir / f"{img_path.stem}.png"
-        renderPM.drawToFile(drawing, out_path, fmt="PNG", dpi=300)
-    except Exception as e:
-        print(f"\n[SKIP] Could not convert {img_path.name}: {e}")
+        cairosvg.svg2png(url=str(img_path), write_to=str(out_path))
+    except Exception:
+        logger.warning(f"Failed to convert '{img_path.name}' into PNG format.")
 
 
 def extract_profile_shard(img_path, output_dir):
-    """Extracts the profile (left side) from the given shard image as a single-line contour."""
+    """Extract the profile (left side) from the given shard image as a single-line contour."""
 
     # todo: improve the code
     # todo: add visualization of the steps?
@@ -115,7 +123,7 @@ def crop_typology(img_path, output_dir):
 
 
 def preprocess_shards():
-    """Cleans and standardizes raw shards for model training."""
+    """Clean and standardize raw shards for model training."""
 
     # Create the necessary folders to store the processed images.
     for dir_path in [DIR_SHARDS_CLEAN_SVG, DIR_SHARDS_CLEAN_PNG, DIR_SHARDS_PROFILES]:
@@ -149,14 +157,14 @@ def preprocess_shards():
 
 
 def preprocess_typology():
-    """Cleans and standardizes typology snapshots for model training."""
+    """Clean and standardize typology snapshots for model training."""
 
     # Create the necessary folders to store the processed images.
-    for dir_path in [DIR_TYP_SKELETONS, DIR_TYP_CROPS]:
+    for dir_path in [DIR_TYPO_SKELETONS, DIR_TYPO_CROPS]:
         create_dir(dir_path, override=OVERRIDE)
 
     # Compute the skeleton to get clean, single-pixel geometric paths.
-    typ_paths = [p for p in DIR_TYPOLOGY_RAW.rglob("*") if p.is_file()]
+    typ_paths = [p for p in DIR_TYPO_RAW.rglob("*") if p.is_file()]
     for typ_path in tqdm(typ_paths, desc="Get Skeletons", unit="img"):
 
         # ! temporary fix
@@ -164,13 +172,13 @@ def preprocess_typology():
         if typ_path.name.startswith(".") or any(x in typ_path.name for x in umlauts):
             continue
 
-        get_skeleton(typ_path, DIR_TYP_SKELETONS)
+        get_skeleton(typ_path, DIR_TYPO_SKELETONS)
         if DEBUG:
             break
 
     # Crop the typology images since only the upper-left side is relevant.
-    for typ_path in tqdm(list(DIR_TYP_SKELETONS.iterdir()), desc="Crop Typology", unit="img"):
-        crop_typology(typ_path, DIR_TYP_CROPS)
+    for typ_path in tqdm(list(DIR_TYPO_SKELETONS.iterdir()), desc="Crop Typology", unit="img"):
+        crop_typology(typ_path, DIR_TYPO_CROPS)
         if DEBUG:
             break
 
