@@ -1,7 +1,6 @@
 import utils
 import model as net
 import plotting
-import testing
 from pathlib import Path
 from keras.optimizers import Adam
 
@@ -42,13 +41,12 @@ if __name__ == "__main__":
     plotting.visualize_predictions(siamese_model, images_L, images_R, pair_labels)
 
     # 7. Speichern
-    siamese_model.save("siamese_model_v1.h5")
-    print("Model saved as siamese_model_v1.h5")
+    siamese_model.save("siamese_model_v1_1.h5")
+    print("Model saved as siamese_model_v1_1.h5")
 
-    # 8. (Optional) Manueller Test
-    # Passe diese Pfade an deine echten Dateien an
-    path1 = "data/PoC/Drag. 32/image_001.svg"
-    path2 = "data/PoC/Drag. 32/image_005.svg"
+    # # 8. (Optional) Manueller Test
+    # path1 = "data/PoC/Drag. 32/image_001.svg"
+    # path2 = "data/PoC/Drag. 32/image_005.svg"
 
-    if Path(path1).exists():
-        testing.test_similarity(siamese_model, path1, path2)
+    # if Path(path1).exists():
+    #     plotting.test_similarity(siamese_model, path1, path2)
