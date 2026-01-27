@@ -10,7 +10,7 @@ MODEL_INPUT_SHAPE = (128, 128, 1)
 
 # Training-Einstellungen
 BATCH_SIZE = 16
-EPOCHS = 15
+EPOCHS = 50
 LEARNING_RATE = 0.0001
 
 
@@ -28,33 +28,29 @@ def build_siamese_network(input_shape):
 
     model = Sequential()
 
-    # Conv 1
-    model.add(Conv2D(64, (10, 10), activation="relu", input_shape=input_shape))
+    # Kleineres Netz: Weniger Filter (32 statt 64/128)
+    model.add(Conv2D(32, (3, 3), activation="relu", input_shape=input_shape))
     model.add(MaxPooling2D())
-    model.add(Dropout(0.1))
+    model.add(Dropout(0.2))  # Etwas mehr Dropout (Vergessen erzwingen)
 
-    # Conv 2
-    model.add(Conv2D(128, (7, 7), activation="relu"))
+    model.add(Conv2D(64, (3, 3), activation="relu"))
     model.add(MaxPooling2D())
-    model.add(Dropout(0.1))
-
-    # Conv 3
-    model.add(Conv2D(128, (4, 4), activation="relu"))
-    model.add(MaxPooling2D())
+    model.add(Dropout(0.2))
 
     model.add(Flatten())
 
-    # Dense Layer
-    model.add(Dense(4096, activation="sigmoid"))
+    # DRASTISCHE REDUKTION:
+    # Vorher: 4096 Neuronen.
+    # Jetzt: 256 Neuronen.
+    # Das zwingt das Modell, wirklich nur die wichtigsten Features zu lernen.
+    model.add(Dense(256, activation="relu"))  # ReLU ist hier besser als Sigmoid
 
     encoded_l = model(left_input)
     encoded_r = model(right_input)
 
-    # Distance Layer
     L1_layer = Lambda(lambda tensors: K.abs(tensors[0] - tensors[1]))
     L1_distance = L1_layer([encoded_l, encoded_r])
 
-    # Prediction
     prediction = Dense(1, activation="sigmoid")(L1_distance)
 
     siamese_net = Model(inputs=[left_input, right_input], outputs=prediction)

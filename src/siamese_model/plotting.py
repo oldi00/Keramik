@@ -1,4 +1,3 @@
-# plotting.py
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -47,3 +46,36 @@ def visualize_predictions(model, images_L, images_R, labels, num_samples=5):
             fontweight="bold",
         )
         plt.show()
+
+
+def show_similarity_test(img_a, img_b, score, threshold=0.5):
+    """
+    Visualisiert das Ergebnis eines Einzel-Tests.
+    """
+    # Text-Logik für den Titel
+    percentage = score * 100
+    if score > threshold:
+        result_text = "MATCH"
+        color = "green"
+    else:
+        result_text = "DIFFERENT"
+        color = "red"
+
+    # Plot erstellen
+    fig, ax = plt.subplots(1, 2, figsize=(6, 3))
+
+    ax[0].imshow(img_a.squeeze(), cmap="gray")
+    ax[0].set_title("Bild A")
+    ax[0].axis("off")
+
+    ax[1].imshow(img_b.squeeze(), cmap="gray")
+    ax[1].set_title("Bild B")
+    ax[1].axis("off")
+
+    plt.suptitle(
+        f"Ergebnis: {result_text}\nScore: {score:.4f} ({percentage:.1f}%)",
+        color=color,
+        fontweight="bold",
+    )
+    plt.tight_layout()
+    plt.show()
