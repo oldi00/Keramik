@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = [
     {name = "Markus Oldenburger", email = "oldenburgermarkus@gmail.com"},
+    {name = "Miles Lenz", email = "miles@lenz-be.de"},
 ]
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,7 +16,13 @@ dependencies = [
     "openpyxl (>=3.1.5,<4.0.0)",
     "tensorflow (>=2.20.0,<3.0.0)",
     "cairosvg (>=2.8.2,<3.0.0)",
-    "matplotlib (>=3.10.7,<4.0.0)"
+    "matplotlib (>=3.10.7,<4.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "scipy (>=1.16.3,<2.0.0)",
+    "joblib (>=1.5.3,<2.0.0)",
+    "pycairo (>=1.29.0,<2.0.0)",
+    "imageio (>=2.37.2,<3.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)"
 ]
 
 

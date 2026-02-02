@@ -2,22 +2,24 @@
 
 **⚠️ WICHTIG: KEINE DATEN IN DAS REPOSITORY ÜBERTRAGEN.**
 
-Dieses Verzeichnis ist so konfiguriert, dass alle Dateien (außer dieser README und dem `typology/` Ordner) von Git ignoriert werden. Sie bleiben also rein lokal auf deinem Rechner.
+Dieses Verzeichnis ist so konfiguriert, dass private Daten (alles außer dieser README und `data/typology/`) von Git ignoriert werden. Sie bleiben rein lokal auf deinem Rechner.
 
 ## Anleitung zur Einrichtung
-1. Lade den geteilten Datensatz von Moodle herunter.
-2. Entpacke/Kopiere die Dateien direkt in diesen Ordner.
-3. Erstelle einen Ordner `png/` und verschiebe alle Bilddateien, die auf der Root-Ebene liegen, dort hinein.
+
+1.  **Download:** Lade den Datensatz von Moodle herunter.
+2.  **Ordner erstellen:** Erstelle einen Ordner `raw/` innerhalb dieses `data/` Verzeichnisses.
+3.  **Entpacken:** Entpacke/Kopiere alle Dateien aus dem Download direkt in `data/raw/`.
+4.  **Aufräumen:**
+    * Erstelle einen Unterordner: `data/raw/png/`
+    * Verschiebe alle Bilddateien, die nun lose in `data/raw/` liegen, in diesen neuen `png/` Ordner.
 
 ## Erwartete Ordnerstruktur
-Dein lokaler Ordner sollte am Ende so aussehen, damit die Skripte reibungslos funktionieren:
-
-- `data/Literatur/`
-- `data/png/`
-- `data/svg/`
-- `data/typology/`
-- `data/Gesamt_DB_export.xlsx`
-- `data/README.md`
-
-## Hinweis
-Alles, was du in diesem Ordner speicherst, wird **nicht** auf GitHub veröffentlicht.
+Damit die Skripte funktionieren, muss es bei dir lokal so aussehen:
+```
+data/
+├── README.md
+├── ...
+└── raw/
+    ├── png/
+    └── ...            <-- (Weitere Dateien aus dem Zip-Ordner)
+```
