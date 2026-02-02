@@ -166,6 +166,9 @@ def preprocess_typology(debug: bool) -> None:
     temp_dir = tempfile.TemporaryDirectory()
     temp_path = Path(temp_dir.name)
 
+    temp_dir_converted = temp_path / "converted_pngs"
+    temp_dir_converted.mkdir()
+
     temp_dir_skeletons = temp_path / "skeletons"
     temp_dir_skeletons.mkdir()
 
@@ -178,7 +181,13 @@ def preprocess_typology(debug: bool) -> None:
         if typ_path.name.startswith(".") or any(x in typ_path.name for x in umlauts):
             continue
 
-        get_skeleton(typ_path, temp_dir_skeletons)
+        processing_path = typ_path
+
+        if typ_path.suffix.lower() == ".svg":
+            convert_svg2png(typ_path, temp_dir_converted)
+            processing_path = temp_dir_converted / f"{typ_path.stem}.png"
+
+        get_skeleton(processing_path, temp_dir_skeletons)
         if debug:
             break
 
