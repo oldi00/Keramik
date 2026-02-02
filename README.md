@@ -25,11 +25,17 @@ Der Befehl added neue Dependencies zur "pyproject.toml" und installiert diese
     poetry add <dependency-name>
     poetry install
     ```
-Dadurch aktualisiert Poetry automatisch die pyproject.toml und poetry.lock und wir alle benutzen die gleichen Dependencies.
-7. Um python files laufen zulassen, musst du einen python kernel adden. 
-Folgenden Interpreter auswählen (VS Code: Ctrl+Shift+P -> Select Interpreter):
- - Windows: .venv\Scripts\python.exe
- - macOS: .venv/bin/python
+    Dadurch aktualisiert Poetry automatisch die pyproject.toml und poetry.lock und wir alle benutzen die gleichen Dependencies.
+
+7. Konfiguration einrichten:
+Damit das Projekt deine lokalen Pfade kennt:
+   - Dupliziere die Datei `config_sample.yaml`.
+   - Benenne die Kopie um in `config.yaml`.
+   - Öffne die `config.yaml` und passe die Pfade/Variablen an deine Ordnerstruktur an.
+
+8. Um python files laufen zulassen, musst du einen python kernel adden. Folgenden Interpreter auswählen (VS Code: Ctrl+Shift+P -> Select Interpreter):
+    - Windows: .venv\Scripts\python.exe
+    - macOS: .venv/bin/python
 
 ## Data Setup
 
