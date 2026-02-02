@@ -1,6 +1,5 @@
 data/*
 !data/README.md
-!data/typology/
 tempCodeRunnerFile*
 
 # Byte-compiled / optimized / DLL files
