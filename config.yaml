@@ -1,7 +1,0 @@
-# config.yaml
-
-paths:
-  shards_raw: "data/raw/svg"
-  shards_clean: "data/processed/shards"
-  typology_raw: "data/poc"  # todo: update path
-  typology_clean: "data/processed/typology"

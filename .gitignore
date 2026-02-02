@@ -1,5 +1,6 @@
 data/*
 !data/README.md
+config.yaml
 tempCodeRunnerFile*
 
 # Byte-compiled / optimized / DLL files
