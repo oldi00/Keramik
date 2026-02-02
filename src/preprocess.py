@@ -56,7 +56,7 @@ def convert_svg2png(img_path: Path, output_dir: Path) -> None:
         logger.warning(f"Failed to convert '{img_path.name}' into PNG format.")
 
 
-def extract_profile_shard(img_path, output_dir):
+def get_profile_shard(img_path: Path):
     """Extract the profile (left side) from the given shard image as a single-line contour."""
 
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
@@ -69,11 +69,10 @@ def extract_profile_shard(img_path, output_dir):
 
     largest_contour = max(contours, key=cv2.contourArea)
 
-    shard = np.ones_like(img) * 255
-    cv2.drawContours(shard, [largest_contour], -1, (0, 0, 0), thickness=1)
+    profile = np.ones_like(img) * 255
+    cv2.drawContours(profile, [largest_contour], -1, (0, 0, 0), thickness=1)
 
-    save_path = Path(output_dir) / Path(img_path).name
-    cv2.imwrite(str(save_path), shard)
+    return profile
 
 
 def get_skeleton(img_path, output_dir):
@@ -142,7 +141,12 @@ def preprocess_shards(debug: bool) -> None:
     # Extract the profile (left side) from each shard.
     shard_paths = list(temp_dir_clean_png.iterdir())
     for shard_path in tqdm(shard_paths, desc="Extract Shard Profiles", unit="img"):
-        extract_profile_shard(shard_path, DIR_SHARDS_CLEAN)
+
+        profile = get_profile_shard(shard_path)
+
+        save_path = Path(DIR_SHARDS_CLEAN) / Path(shard_path).name
+        cv2.imwrite(str(save_path), profile)
+
         if debug:
             break
 
