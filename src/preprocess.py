@@ -78,7 +78,8 @@ def get_profile_shard(img_path: Path):
 def get_skeleton(img_path, output_dir):
     """Compute the skeleton of the given image."""
 
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    file_bytes = np.fromfile(str(img_path), dtype=np.uint8)
+    img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
 
     blurred = cv2.GaussianBlur(img, (5, 5), 0)
 
@@ -207,18 +208,42 @@ def get_args():
         help="Force regeneration: Delete and re-create all output directories from scratch."
     )
 
+    parser.add_argument(
+        "--only_shards",
+        action="store_true",
+        help="Process only the shard dataset."
+    )
+
+    parser.add_argument(
+        "--only_typology",
+        action="store_true",
+        help="Process only the typology dataset."
+    )
+
     return parser.parse_args()
 
 
-def main(debug, overwrite):
+def main(args):
 
-    for dir_path in [DIR_SHARDS_CLEAN, DIR_TYPOLOGY_CLEAN]:
-        create_dir(dir_path, overwrite)
+    if args.debug and args.overwrite:
+        logger.warning("Debug mode enabled. Disabling overwrite to protect data.")
+        args.overwrite = False
 
-    preprocess_shards(debug)
-    preprocess_typology(debug)
+    if not args.only_shards and not args.only_typology:
+        process_shards = True
+        process_typology = True
+    else:
+        process_shards = args.only_shards
+        process_typology = args.only_typology
+
+    if process_shards:
+        create_dir(DIR_SHARDS_CLEAN, args.overwrite)
+        preprocess_shards(args.debug)
+
+    if process_typology:
+        create_dir(DIR_TYPOLOGY_CLEAN, args.overwrite)
+        preprocess_typology(args.debug)
 
 
 if __name__ == "__main__":
-    args = get_args()
-    main(args.debug, args.overwrite)
+    main(get_args())
