@@ -2,6 +2,7 @@ data/*
 !data/README.md
 config.yaml
 tempCodeRunnerFile*
+sandbox/
 
 # macOS .DS_Store files in model directory
 data/typology/modelle/**/.DS_Store
