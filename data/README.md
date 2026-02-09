@@ -18,7 +18,7 @@ Damit die Skripte funktionieren, muss es bei dir lokal so aussehen:
 ```
 data/
 ├── README.md
-├── typology/          <-- (Typtafeln aus der Literatur)
+├── ...
 └── raw/
     ├── png/
     └── ...            <-- (Weitere Dateien aus dem Zip-Ordner)

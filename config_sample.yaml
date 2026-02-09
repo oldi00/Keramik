@@ -1,0 +1,5 @@
+paths:
+  shards_raw: "data/raw/svg"
+  shards_clean: "data/processed/shards"
+  typology_raw: ""  # Hier den absoluten Pfad zum Cloud-Ordner einfügen.
+  typology_clean: "data/processed/typology"

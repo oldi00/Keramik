@@ -1,7 +1,10 @@
 data/*
 !data/README.md
-!data/typology/
+config.yaml
 tempCodeRunnerFile*
+
+# macOS .DS_Store files in model directory
+data/typology/modelle/**/.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
