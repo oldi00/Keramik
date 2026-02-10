@@ -1,4 +1,12 @@
-"""Clean and extract geometric profiles from raw shard and typology scans."""
+"""
+Clean and extract geometric profiles from raw shard and typology scans.
+
+Arguments:
+  -d, --debug        Run in debug mode (process single images only).
+  -o, --overwrite    Force regeneration (delete and recreate output dirs).
+  --only_shards      Process only the shard dataset.
+  --only_typology    Process only the typology dataset.
+"""
 
 from utils import load_config, create_dir
 import tempfile
@@ -51,7 +59,26 @@ def convert_svg2png(img_path: Path, output_dir: Path) -> None:
     out_path = output_dir / f"{img_path.stem}.png"
 
     try:
-        cairosvg.svg2png(url=str(img_path), write_to=str(out_path), background_color="white")
+
+        tree = ET.parse(img_path)
+        root = tree.getroot()
+
+        for parent in tree.iter():
+            for child in list(parent):
+                if 'image' in child.tag:
+                    parent.remove(child)
+                    logger.debug(f"Removed embedded image from {img_path.name}")
+
+        clean_svg_string = ET.tostring(root, encoding='utf-8')
+
+        cairosvg.svg2png(
+            bytestring=clean_svg_string,
+            write_to=str(out_path),
+            background_color="white",
+            scale=2.0
+        )
+        return out_path
+
     except Exception:
         logger.warning(f"Failed to convert '{img_path.name}' into PNG format.")
 
@@ -178,7 +205,10 @@ def preprocess_typology(debug: bool) -> None:
 
         # ! temporary fix
         umlauts = ['ä', 'ö', 'ü', 'Ä', 'Ö', 'Ü', 'ß']
-        if typ_path.name.startswith(".") or any(x in typ_path.name for x in umlauts):
+        valid_extensions = {'.jpg', '.jpeg', '.png', '.svg'}
+        if (typ_path.name.startswith(".")
+                or any(x in typ_path.name for x in umlauts)
+                or typ_path.suffix.lower() not in valid_extensions):
             continue
 
         processing_path = typ_path
