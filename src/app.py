@@ -26,7 +26,7 @@ st.set_page_config(
 
 # Pfad zu den vorverarbeiteten Typologie-Daten (Crops)
 # Passen Sie diesen Pfad ggf. an Ihre Ordnerstruktur an (relativ zum Root)
-TYPOLOGY_FOLDER = Path("data/preprocess/typology_crops")
+TYPOLOGY_FOLDER = Path("data/processed/typology")
 
 # --- STYLES ---
 st.markdown(
