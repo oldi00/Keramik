@@ -26,7 +26,10 @@ DIR_SHARDS_CLEAN = CONFIG["paths"]["shards_clean"]
 DIR_TYPOLOGY_RAW = CONFIG["paths"]["typology_raw"]
 DIR_TYPOLOGY_CLEAN = CONFIG["paths"]["typology_clean"]
 
-logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s",)
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -65,17 +68,17 @@ def convert_svg2png(img_path: Path, output_dir: Path) -> None:
 
         for parent in tree.iter():
             for child in list(parent):
-                if 'image' in child.tag:
+                if "image" in child.tag:
                     parent.remove(child)
                     logger.debug(f"Removed embedded image from {img_path.name}")
 
-        clean_svg_string = ET.tostring(root, encoding='utf-8')
+        clean_svg_string = ET.tostring(root, encoding="utf-8")
 
         cairosvg.svg2png(
             bytestring=clean_svg_string,
             write_to=str(out_path),
             background_color="white",
-            scale=2.0
+            scale=2.0,
         )
         return out_path
 
@@ -92,7 +95,9 @@ def get_profile_shard(img_path: Path):
     kernel = np.ones((5, 5), np.uint8)
 
     thresh_clean = cv2.morphologyEx(img_binary, cv2.MORPH_OPEN, kernel, iterations=2)
-    contours, _ = cv2.findContours(thresh_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contours, _ = cv2.findContours(
+        thresh_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+    )
 
     largest_contour = max(contours, key=cv2.contourArea)
 
@@ -112,7 +117,9 @@ def get_skeleton(img_path, output_dir):
 
     _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
-    skeleton = cv2.ximgproc.thinning(binary, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
+    skeleton = cv2.ximgproc.thinning(
+        binary, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN
+    )
 
     skeleton = cv2.bitwise_not(skeleton)
 
@@ -127,8 +134,8 @@ def crop_typology(img_path, output_dir):
 
     h, w = img.shape
 
-    crop = img[:, :int(w * 0.45)]
-    crop = crop[:int(h * 0.75), :]
+    crop = img[:, : int(w * 0.45)]
+    crop = crop[: int(h * 0.75), :]
 
     out_path = Path(output_dir) / Path(img_path).name
     cv2.imwrite(out_path, crop)
@@ -154,13 +161,17 @@ def preprocess_shards(debug: bool) -> None:
     temp_dir_clean_png.mkdir()
 
     # Remove non-relevant artifacts (IDs, scale) from raw SVGs so the model can focus on geometry.
-    for svg_path in tqdm(list(DIR_SHARDS_RAW.iterdir()), desc="Clean Shards", unit="img"):
+    for svg_path in tqdm(
+        list(DIR_SHARDS_RAW.iterdir()), desc="Clean Shards", unit="img"
+    ):
         clean_shard(svg_path, temp_dir_clean_svg)
         if debug:
             break
 
     # Transform clean SVGs to PNG format since it is easier to work with later.
-    for svg_path in tqdm(list(temp_dir_clean_svg.iterdir()), desc="Convert SVGs", unit="img"):
+    for svg_path in tqdm(
+        list(temp_dir_clean_svg.iterdir()), desc="Convert SVGs", unit="img"
+    ):
         if not (temp_dir_clean_png / f"{svg_path.stem}.png").exists():
             convert_svg2png(svg_path, temp_dir_clean_png)
         if debug:
@@ -202,13 +213,14 @@ def preprocess_typology(debug: bool) -> None:
     # Compute the skeleton to get clean, single-pixel geometric paths.
     typ_paths = [p for p in DIR_TYPOLOGY_RAW.rglob("*") if p.is_file()]
     for typ_path in tqdm(typ_paths, desc="Get Skeletons", unit="img"):
-
         # ! temporary fix
-        umlauts = ['ä', 'ö', 'ü', 'Ä', 'Ö', 'Ü', 'ß']
-        valid_extensions = {'.jpg', '.jpeg', '.png', '.svg'}
-        if (typ_path.name.startswith(".")
-                or any(x in typ_path.name for x in umlauts)
-                or typ_path.suffix.lower() not in valid_extensions):
+        umlauts = ["ä", "ö", "ü", "Ä", "Ö", "Ü", "ß"]
+        valid_extensions = {".jpg", ".jpeg", ".png", ".svg"}
+        if (
+            typ_path.name.startswith(".")
+            or any(x in typ_path.name for x in umlauts)
+            or typ_path.suffix.lower() not in valid_extensions
+        ):
             continue
 
         processing_path = typ_path
@@ -222,7 +234,9 @@ def preprocess_typology(debug: bool) -> None:
             break
 
     # Crop the typology images since only the upper-left side is relevant.
-    for typ_path in tqdm(list(temp_dir_skeletons.iterdir()), desc="Crop Typology", unit="img"):
+    for typ_path in tqdm(
+        list(temp_dir_skeletons.iterdir()), desc="Crop Typology", unit="img"
+    ):
         crop_typology(typ_path, DIR_TYPOLOGY_CLEAN)
         if debug:
             break
@@ -233,30 +247,31 @@ def preprocess_typology(debug: bool) -> None:
 def get_args():
 
     parser = argparse.ArgumentParser(
-        description="Clean and extract geometric profiles from raw shard and typology scans.")
-
-    parser.add_argument(
-        "-d", "--debug",
-        action="store_true",
-        help="Run in debug mode: Process only a single shard and typology image for testing."
+        description="Clean and extract geometric profiles from raw shard and typology scans."
     )
 
     parser.add_argument(
-        "-o", "--overwrite",
+        "-d",
+        "--debug",
         action="store_true",
-        help="Force regeneration: Delete and re-create all output directories from scratch."
+        help="Run in debug mode: Process only a single shard and typology image for testing.",
     )
 
     parser.add_argument(
-        "--only_shards",
+        "-o",
+        "--overwrite",
         action="store_true",
-        help="Process only the shard dataset."
+        help="Force regeneration: Delete and re-create all output directories from scratch.",
+    )
+
+    parser.add_argument(
+        "--only_shards", action="store_true", help="Process only the shard dataset."
     )
 
     parser.add_argument(
         "--only_typology",
         action="store_true",
-        help="Process only the typology dataset."
+        help="Process only the typology dataset.",
     )
 
     return parser.parse_args()

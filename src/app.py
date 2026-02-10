@@ -13,7 +13,8 @@ import sys
 
 sys.path.append(str(Path(__file__).parent))
 
-from geometric_matching import utils, solver
+import utils
+import solver
 
 # --- CONFIG ---
 st.set_page_config(

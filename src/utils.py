@@ -10,18 +10,18 @@ from pathlib import Path
 def normalize_name(text):
     """Returns the normalized form of the given text."""
 
-    return re.sub(r'[^a-z0-9]', '', text.lower())
+    return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
 def load_config(config_path="config.yaml"):
     """Load a config file based on the given path."""
 
-    with open(config_path, "r", encoding='utf-8') as file:
+    with open(config_path, "r", encoding="utf-8") as file:
         config = yaml.safe_load(file)
 
     # Convert strings to Path objects automatically.
-    for key, val in config['paths'].items():
-        config['paths'][key] = Path(val)
+    for key, val in config["paths"].items():
+        config["paths"][key] = Path(val)
 
     return config
 
@@ -33,7 +33,9 @@ def safe_to_delete(dir_path):
     project_root = Path.cwd().resolve()
 
     if not target.is_relative_to(project_root):
-        raise ValueError(f"Security check failed: Path '{target}' is outside the project scope.")
+        raise ValueError(
+            f"Security check failed: Path '{target}' is outside the project scope."
+        )
 
     if target == project_root:
         raise ValueError("Operation refused: Cannot delete the project root directory.")

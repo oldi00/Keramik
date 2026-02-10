@@ -25,7 +25,7 @@ def load_test_set_from_excel():
     """
 
     df = pd.read_excel(EXCEL_PATH)
-    df.columns = df.columns.str.replace('Sample.', '', regex=False)
+    df.columns = df.columns.str.replace("Sample.", "", regex=False)
 
     test_set = []
 
@@ -41,11 +41,9 @@ def load_test_set_from_excel():
         if normalize_name(shard_type) not in TARGET_TYPES or not path.exists():
             continue
 
-        test_set.append({
-            "id": shard_id,
-            "type": normalize_name(shard_type),
-            "path": path
-        })
+        test_set.append(
+            {"id": shard_id, "type": normalize_name(shard_type), "path": path}
+        )
 
     return test_set
 
@@ -68,7 +66,7 @@ def load_ground_truth_typology():
         typology[normalize_name(typ_path.stem)] = {
             "points": points,
             "dist_map": dist_map,
-            "path": str(typ_path)
+            "path": str(typ_path),
         }
 
     return typology
@@ -80,7 +78,9 @@ def process_single_match(typ_name, typ_data, points_shard):
     with the typology name for parallel processing.
     """
 
-    score, params = solve_matching(points_shard, typ_data["points"], typ_data["dist_map"])
+    score, params = solve_matching(
+        points_shard, typ_data["points"], typ_data["dist_map"]
+    )
 
     return {"typ_name": typ_name, "score": score, "params": params}
 
@@ -113,7 +113,7 @@ def main():
 
             # Sort by ascending score because Chamfer Distance measures error.
             # This means 0 is a perfect match.
-            results.sort(key=lambda x: x['score'])
+            results.sort(key=lambda x: x["score"])
 
             top_3_types = [x["typ_name"] for x in results[:3]]
 
@@ -136,7 +136,7 @@ def main():
                 "typ_path": typology[results[0]["typ_name"]]["path"],
                 "dist_map": typology[results[0]["typ_name"]]["dist_map"],
                 "points": apply_transformation(points_shard, *results[0]["params"]),
-                "out_path": out_dir / f"{shard["id"]}.png"
+                "out_path": out_dir / f"{shard["id"]}.png",
             }
             save_heatmap_overlay(**heatmap_config)
 
