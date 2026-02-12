@@ -40,7 +40,7 @@ def load_config(config_path="config.yaml"):
     return config
 
 
-def safe_to_delete(dir_path):
+def safe_to_delete(dir_path: str) -> bool:
     """
     Check if the given directory is safe to delete.
 
@@ -60,7 +60,7 @@ def safe_to_delete(dir_path):
     return True
 
 
-def create_dir(path, force=False):
+def create_dir(path: Path, force: bool = False) -> None:
     """Create an empty directory at the given path."""
 
     if path.exists() and safe_to_delete(path) and force:
@@ -68,13 +68,21 @@ def create_dir(path, force=False):
     path.mkdir(parents=True, exist_ok=True)
 
 
-def get_points(img_path, step=5):
-    """Return a list of points of black pixels, downsampled for speed."""
+def get_points(img: np.ndarray, step=5) -> np.ndarray:
+    """
+    Extract points from black pixels in the image, downsampled for speed.
 
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    img = cv2.bitwise_not(img)  # switch black/white pixels
+    Args:
+        img (np.ndarray): Grayscale image (White background, Black lines).
+        step (int): Downsample factor (take every n-th point).
 
-    points = cv2.findNonZero(img)
+    Returns:
+        np.ndarray: List of (x, y) coordinates with shape (N, 2).
+    """
+
+    img_inv = cv2.bitwise_not(img)
+
+    points = cv2.findNonZero(img_inv)
     points = points.reshape(-1, 2)
 
     # Choose only every n-th point. This keeps the shape, but
@@ -84,11 +92,10 @@ def get_points(img_path, step=5):
     return points
 
 
-def get_dist_map(img_path):
-    """Load an image and returns the distance map. Assumes the image is binarized."""
+def get_dist_map(img: np.ndarray) -> np.ndarray:
+    """Compute the distance map from an image."""
 
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-
-    dist_map = cv2.distanceTransform(img, cv2.DIST_L2, 5)
+    _, binary_img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
+    dist_map = cv2.distanceTransform(binary_img, cv2.DIST_L2, 5)
 
     return dist_map
