@@ -17,7 +17,7 @@ CLI Arguments:
     --only_typology    Process only the typology dataset.
 """
 
-from utils import load_config, load_image_gray, create_dir
+from utils import load_config, load_image_gray, create_dir, crop_to_content
 import logging
 import argparse
 import cairosvg
@@ -122,13 +122,16 @@ def preprocess_shard(shard_path: str) -> np.ndarray:
         return None
 
     clean_svg = remove_artifacts(shard_path)
+
     img_array = convert_svg2array(clean_svg)
+
     profile = get_profile(img_array)
+    profile = crop_to_content(profile)
 
     return profile
 
 
-def preprocess_typology(typology_path: str, crop: bool = True) -> np.ndarray:
+def preprocess_typology(typology_path: str) -> np.ndarray:
     """Extract skeleton and crop the typology image."""
 
     path_obj = Path(typology_path)
@@ -143,9 +146,12 @@ def preprocess_typology(typology_path: str, crop: bool = True) -> np.ndarray:
     else:
         img_array = load_image_gray(typology_path)
 
+    if np.all(img_array == 0) or np.all(img_array == 255):
+        logger.warning(f"Skipping '{path_obj.name}': Image is pure white/black.")
+        return None
+
     skeleton = get_skeleton(img_array)
-    if crop:
-        skeleton = crop_typology(skeleton)
+    skeleton = crop_to_content(skeleton)
 
     return skeleton
 
@@ -183,7 +189,7 @@ def preprocess_batch(batch_type: str, limit: int = None, force: bool = False) ->
     descr = f"Preprocessing {batch_type.title()} Batch"
     for file_path in tqdm(files_to_process, unit="img", desc=descr):
 
-        save_name = f"{file_path.stem}.png"
+        save_name = f"{file_path.stem}.png".replace("recons_", "")
         save_path = output_dir / save_name
 
         if save_path.exists() and not force:

@@ -99,3 +99,25 @@ def get_dist_map(img: np.ndarray) -> np.ndarray:
     dist_map = cv2.distanceTransform(binary_img, cv2.DIST_L2, 5)
 
     return dist_map
+
+
+def crop_to_content(img, padding=0):
+    """Crop an image to its non-white content."""
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+
+    _, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY_INV)
+
+    coords = cv2.findNonZero(thresh)
+    if coords is None:
+        return img
+
+    x, y, w, h = cv2.boundingRect(coords)
+
+    img_h, img_w = img.shape[:2]
+    x_start = max(0, x - padding)
+    y_start = max(0, y - padding)
+    x_end = min(img_w, x + w + padding)
+    y_end = min(img_h, y + h + padding)
+
+    return img[y_start:y_end, x_start:x_end]
