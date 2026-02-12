@@ -1,20 +1,34 @@
-"""A collection of utility functions."""
+"""Provide utility functions for image operations, directory creation and config file."""
 
+from pathlib import Path
 import re
 import shutil
-import cv2
 import yaml
-from pathlib import Path
+import cv2
+import numpy as np
 
 
 def normalize_name(text):
-    """Returns the normalized form of the given text."""
+    """Normalize the given text."""
 
     return re.sub(r'[^a-z0-9]', '', text.lower())
 
 
+def load_image_gray(img_path):
+    """Load the image at the given path in grayscale color space."""
+
+    with open(img_path, "rb") as f:
+        file_bytes = bytearray(f.read())
+
+    array = np.asarray(file_bytes, dtype=np.uint8)
+
+    img = cv2.imdecode(array, cv2.IMREAD_GRAYSCALE)
+
+    return img
+
+
 def load_config(config_path="config.yaml"):
-    """Load a config file based on the given path."""
+    """Load a YAML config file based on the given path."""
 
     with open(config_path, "r", encoding='utf-8') as file:
         config = yaml.safe_load(file)
@@ -27,7 +41,12 @@ def load_config(config_path="config.yaml"):
 
 
 def safe_to_delete(dir_path):
-    """Checks if the given directory is safe to delete."""
+    """
+    Check if the given directory is safe to delete.
+
+    A directory is considered safe to delete if it is inside the
+    project folder and is different from the project root.
+    """
 
     target = Path(dir_path).resolve()
     project_root = Path.cwd().resolve()
@@ -41,16 +60,16 @@ def safe_to_delete(dir_path):
     return True
 
 
-def create_dir(path, override=False):
-    """Creates a directory at the given path."""
+def create_dir(path, force=False):
+    """Create an empty directory at the given path."""
 
-    if path.exists() and safe_to_delete(path) and override:
+    if path.exists() and safe_to_delete(path) and force:
         shutil.rmtree(path)
     path.mkdir(parents=True, exist_ok=True)
 
 
 def get_points(img_path, step=5):
-    """Returns a list of points of black pixels, downsampled for speed."""
+    """Return a list of points of black pixels, downsampled for speed."""
 
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     img = cv2.bitwise_not(img)  # switch black/white pixels
@@ -66,7 +85,7 @@ def get_points(img_path, step=5):
 
 
 def get_dist_map(img_path):
-    """Loads an image and returns the distance map. Assumes the image is binarized."""
+    """Load an image and returns the distance map. Assumes the image is binarized."""
 
     img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
