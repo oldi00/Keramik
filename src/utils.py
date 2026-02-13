@@ -92,6 +92,22 @@ def get_points(img: np.ndarray, step=5) -> np.ndarray:
     return points
 
 
+def apply_transformation(points, scale, rotation, translation):
+    """Apply a transformation to a (N, 2) array of points."""
+
+    p_x, p_y = points[:, 0], points[:, 1]
+    t_x, t_y = translation
+
+    cos, sin = np.cos(rotation), np.sin(rotation)
+
+    # Transform all shard points. Apply scale and rotation
+    # first, then translate to the new position.
+    x = (scale * (p_x * cos - p_y * sin)) + t_x
+    y = (scale * (p_x * sin + p_y * cos)) + t_y
+
+    return np.array([x, y]).T
+
+
 def get_dist_map(img: np.ndarray) -> np.ndarray:
     """Compute the distance map from an image."""
 
@@ -101,7 +117,7 @@ def get_dist_map(img: np.ndarray) -> np.ndarray:
     return dist_map
 
 
-def crop_to_content(img, padding=0):
+def crop_to_content(img, padding=8):
     """Crop an image to its non-white content."""
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
