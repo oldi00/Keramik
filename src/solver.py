@@ -1,6 +1,6 @@
 """..."""
 
-from utils import get_points, get_dist_map, load_config, load_image_gray
+from utils import get_points, get_dist_map, load_config, load_image_gray, normalize_name
 from ransac import find_coarse_match
 from pathlib import Path
 from multiprocessing import Pool, cpu_count
@@ -8,7 +8,6 @@ from functools import partial
 import pickle
 import logging
 import numpy as np
-from tqdm import tqdm
 
 CONFIG = load_config()
 
@@ -30,15 +29,18 @@ def build_typology_cache() -> None:
         logger.warning(f"No PNG files found in {TYPOLOGY_DIR}. Cache will be empty!")
         return []
 
-    cache = []
+    cache = {}
     for path in typology_files:
+
         img = load_image_gray(path)
-        cache.append({
-            "name": path.stem,
+
+        name_normalized = normalize_name(path.stem)
+        cache[name_normalized] = {
+            "name": name_normalized,
             "path": str(path),
             "points": get_points(img),
             "dist_map": get_dist_map(img)
-        })
+        }
 
     with open(CACHE_FILE, "wb") as f:
         pickle.dump(cache, f)
@@ -65,7 +67,7 @@ def load_typology_data() -> None:
         return build_typology_cache()
 
     current_files = {p.name for p in Path(TYPOLOGY_DIR).glob("*.png")}
-    cached_files = {Path(item["path"]).name for item in cached_data}
+    cached_files = {Path(item["path"]).name for item in cached_data.values()}
 
     if current_files != cached_files:
         diff_count = len(current_files.symmetric_difference(cached_files))
@@ -86,28 +88,26 @@ def match_single_entry(typology_entry: dict, points_shard: np.ndarray) -> dict:
     )
 
     return {
-        "name": typology_entry["name"],
+        "name": normalize_name(typology_entry["name"]),
         "path": typology_entry["path"],
         "score": score,
         "params": params,
     }
 
 
-def find_top_matches(shard_img: np.ndarray, top_k: int = 3):
+def find_top_matches(shard_img: np.ndarray, typology_data=None, top_k: int = 3):
     """..."""
 
     points_shard = get_points(shard_img)
-    typology_data = load_typology_data()
+
+    if not typology_data:
+        typology_data = load_typology_data()
 
     num_cores = cpu_count()
     worker_func = partial(match_single_entry, points_shard=points_shard)
 
     with Pool(processes=num_cores) as pool:
-        candidates = list(tqdm(
-            pool.imap(worker_func, typology_data),
-            total=len(typology_data),
-            unit="match"
-        ))
+        candidates = list(pool.imap(worker_func, typology_data.values()))
 
     candidates.sort(key=lambda x: x["score"])
 
@@ -119,9 +119,16 @@ def find_top_matches(shard_img: np.ndarray, top_k: int = 3):
 
 if __name__ == "__main__":
 
-    shard_path = "data/processed/shards/recons_10004.png"
+    import time
+
+    start_time = time.time()
+
+    shard_path = "data/processed/shards/10004.png"
     shard_img = load_image_gray(shard_path)
 
     top_matches = find_top_matches(shard_img)
 
-    print(top_matches)
+    print([match for match in top_matches])
+
+    end_time = time.time()
+    print(f"Time: {end_time - start_time:.2f}")
