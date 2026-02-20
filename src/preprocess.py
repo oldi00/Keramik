@@ -18,6 +18,7 @@ CLI Arguments:
 """
 
 from utils import load_config, load_image_gray, create_dir, crop_to_content
+from typing import Union, BinaryIO
 import logging
 import argparse
 import cairosvg
@@ -37,13 +38,14 @@ DIR_TYPOLOGY_CLEAN = CONFIG["paths"]["typology_clean"]
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s",)
 logger = logging.getLogger(__name__)
 
+SourceType = Union[str, Path, BinaryIO]
 
-def remove_artifacts(svg_path: str) -> bytes:
+
+def remove_artifacts(svg_source: SourceType) -> bytes:
     """Remove artifacts (ID, scale, etc.) from the given shard SVG."""
 
-    with open(svg_path, 'r', encoding='utf-8') as f:
-        tree = ET.parse(f)
-        root = tree.getroot()
+    tree = ET.parse(svg_source)
+    root = tree.getroot()
 
     namespace = "{http://www.w3.org/2000/svg}"
     tags_to_remove = ['image', 'text', 'rect', f'{namespace}image', f'{namespace}text']
@@ -113,15 +115,15 @@ def crop_typology(img: np.ndarray) -> np.ndarray:
     return crop
 
 
-def preprocess_shard(shard_path: str) -> np.ndarray:
+def preprocess_shard(source: SourceType) -> np.ndarray:
     """Clean the shard (SVG) and extract its profile."""
 
-    path_obj = Path(shard_path)
-    if path_obj.suffix != ".svg":
-        logger.warning(f"Skipping '{path_obj.name}': Not an SVG file.")
-        return None
+    if isinstance(source, (str, Path)):
+        if Path(source) != ".svg":
+            logger.warning(f"Skipping '{Path(source).name}': Not an SVG file.")
+            return None
 
-    clean_svg = remove_artifacts(shard_path)
+    clean_svg = remove_artifacts(source)
 
     img_array = convert_svg2array(clean_svg)
 
