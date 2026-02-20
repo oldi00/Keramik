@@ -1,5 +1,4 @@
 data/*
-!data/README.md
 config.yaml
 tempCodeRunnerFile*
 sandbox/
