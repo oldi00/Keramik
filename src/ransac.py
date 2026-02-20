@@ -89,7 +89,18 @@ def score_survivors(points_shard, dist_map, scale, rotation, t_x, t_y):
     if np.any(is_inside):
         scores[is_inside] = dist_map[iy[is_inside], ix[is_inside]]
 
-    return np.mean(scores, axis=1)
+    base_score = np.mean(scores, axis=1)
+
+    min_y = np.min(dst_y, axis=1)
+
+    rim_threshold = 12.0
+
+    distance_below_rim = np.maximum(0, min_y - rim_threshold)
+    distance_above_top = np.maximum(0, -min_y)
+
+    y_penalty = 0.5 * (distance_below_rim**2 + distance_above_top**2)
+
+    return base_score + y_penalty
 
 
 def find_coarse_match(points_shard, points_typology, dist_map):
