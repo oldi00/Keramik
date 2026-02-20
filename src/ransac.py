@@ -3,27 +3,19 @@ Run RANSAC-based geometric matching to estimate similarity transformations
 (scale, rotation, translation) between shard and typology point sets.
 """
 
-from utils import load_config
 import numpy as np
 
-CONFIG = load_config()
 
-MIN_SCALE = CONFIG["parameters"]["ransac"]["min_scale"]
-MAX_SCALE = CONFIG["parameters"]["ransac"]["max_scale"]
-MAX_ROTATION = np.deg2rad(CONFIG["parameters"]["ransac"]["max_rotation_deg"])
-ITERATIONS = CONFIG["parameters"]["ransac"]["iterations"]
-
-
-def generate_batch_indices(n_shard, n_typ):
+def generate_batch_indices(n_shard, n_typ, iterations):
     """Generate random point pair indices for RANSAC hypothesis generation."""
 
-    idx_p = np.random.randint(0, n_shard, (ITERATIONS, 2))
-    idx_q = np.random.randint(0, n_typ, (ITERATIONS, 2))
+    idx_p = np.random.randint(0, n_shard, (iterations, 2))
+    idx_q = np.random.randint(0, n_typ, (iterations, 2))
 
     return idx_p, idx_q
 
 
-def estimate_geometric_params(p1, p2, q1, q2):
+def estimate_geometric_params(p1, p2, q1, q2, config):
     """Estimate vectorized similarity transformation parameters (S, R, T) from point pairs."""
 
     vec_p = p2 - p1
@@ -38,7 +30,7 @@ def estimate_geometric_params(p1, p2, q1, q2):
     scale = np.zeros_like(len_p)
     np.divide(len_q, len_p, out=scale, where=valid_mask)
 
-    valid_mask &= (scale >= MIN_SCALE) & (scale <= MAX_SCALE)
+    valid_mask &= (scale >= config["min_scale"]) & (scale <= config["max_scale"])
 
     ang_p = np.arctan2(vec_p[:, 1], vec_p[:, 0])
     ang_q = np.arctan2(vec_q[:, 1], vec_q[:, 0])
@@ -47,7 +39,8 @@ def estimate_geometric_params(p1, p2, q1, q2):
     # Normalize angles to [-pi, pi] to ensure valid_mask checks minimal rotation distance.
     rotation = (rotation + np.pi) % (2 * np.pi) - np.pi
 
-    valid_mask &= (np.abs(rotation) <= MAX_ROTATION)
+    max_rotation = np.deg2rad(config["max_rotation_deg"])
+    valid_mask &= (np.abs(rotation) <= max_rotation)
 
     cos_r = np.cos(rotation)
     sin_r = np.sin(rotation)
@@ -103,17 +96,21 @@ def score_survivors(points_shard, dist_map, scale, rotation, t_x, t_y):
     return base_score + y_penalty
 
 
-def find_coarse_match(points_shard, points_typology, dist_map):
+def find_coarse_match(points_shard, points_typology, dist_map, config):
     """Execute RANSAC pipeline to identify the best geometric alignment."""
 
-    idx_p, idx_q = generate_batch_indices(len(points_shard), len(points_typology))
+    idx_p, idx_q = generate_batch_indices(
+        len(points_shard),
+        len(points_typology),
+        iterations=config["iterations"]
+    )
 
     p1 = points_shard[idx_p[:, 0]]
     p2 = points_shard[idx_p[:, 1]]
     q1 = points_typology[idx_q[:, 0]]
     q2 = points_typology[idx_q[:, 1]]
 
-    scale, rot, tx, ty, valid_mask = estimate_geometric_params(p1, p2, q1, q2)
+    scale, rot, tx, ty, valid_mask = estimate_geometric_params(p1, p2, q1, q2, config)
 
     # Early exit if nothing matches constraints.
     if not np.any(valid_mask):

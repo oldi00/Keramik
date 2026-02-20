@@ -9,24 +9,19 @@ import pickle
 import logging
 import numpy as np
 
-CONFIG = load_config()
-
-TYPOLOGY_DIR = CONFIG["paths"]["typology_clean"]
-CACHE_FILE = CONFIG["paths"]["typology_cache"]
-
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s",)
 logger = logging.getLogger(__name__)
 
 
-def build_typology_cache() -> None:
+def build_typology_cache(typology_dir: str, cache_file: str) -> None:
     """Calculate points and distance map for all typology files and store them."""
 
-    Path(CACHE_FILE).parent.mkdir(parents=True, exist_ok=True)
+    Path(cache_file).parent.mkdir(parents=True, exist_ok=True)
 
-    typology_files = list(Path(TYPOLOGY_DIR).glob("*.png"))
+    typology_files = list(Path(typology_dir).glob("*.png"))
 
     if not typology_files:
-        logger.warning(f"No PNG files found in {TYPOLOGY_DIR}. Cache will be empty!")
+        logger.warning(f"No PNG files found in {typology_dir}. Cache will be empty!")
         return []
 
     cache = {}
@@ -42,49 +37,55 @@ def build_typology_cache() -> None:
             "dist_map": get_dist_map(img)
         }
 
-    with open(CACHE_FILE, "wb") as f:
+    with open(cache_file, "wb") as f:
         pickle.dump(cache, f)
 
-    logger.info(f"Successfully saved {len(cache)} entries to {CACHE_FILE}")
+    logger.info(f"Successfully saved {len(cache)} entries to {cache_file}")
     return cache
 
 
-def load_typology_data() -> None:
+def load_typology_data(config: dict) -> None:
     """
     Load typology cache or build cache if path is invalid, cache could
     not be loaded or cache is outdated.
     """
 
-    if not Path(CACHE_FILE).exists():
+    typology_dir = config["paths"]["typology_clean"]
+    cache_file = config["paths"]["typology_cache"]
+
+    if not Path(cache_file).exists():
         logger.info("Cache file not found. Triggering build...")
-        return build_typology_cache()
+        return build_typology_cache(typology_dir, cache_file)
 
     try:
-        with open(CACHE_FILE, "rb") as f:
+        with open(cache_file, "rb") as f:
             cached_data = pickle.load(f)
     except (EOFError, pickle.UnpicklingError):
         logger.warning("Cache file is corrupted or empty. Rebuilding...")
-        return build_typology_cache()
+        return build_typology_cache(typology_dir, cache_file)
 
-    current_files = {p.name for p in Path(TYPOLOGY_DIR).glob("*.png")}
+    current_files = {p.name for p in Path(typology_dir).glob("*.png")}
     cached_files = {Path(item["path"]).name for item in cached_data.values()}
 
     if current_files != cached_files:
         diff_count = len(current_files.symmetric_difference(cached_files))
         logger.info(f"Cache is stale ({diff_count} file difference detected). Rebuilding...")
-        return build_typology_cache()
+        return build_typology_cache(typology_dir, cache_file)
 
     logger.info(f"Cache is valid. Loaded {len(cached_data)} items.")
     return cached_data
 
 
-def match_single_entry(typology_entry: dict, points_shard: np.ndarray) -> dict:
+def match_single_entry(typology_entry: dict, points_shard: np.ndarray, config: dict) -> dict:
     """Match a single shard against a single typology on a separate CPU core."""
+
+    ransac_params = config["parameters"]["ransac"]
 
     score, params = find_coarse_match(
         points_shard,
         typology_entry["points"],
-        typology_entry["dist_map"]
+        typology_entry["dist_map"],
+        config=ransac_params
     )
 
     return {
@@ -95,16 +96,19 @@ def match_single_entry(typology_entry: dict, points_shard: np.ndarray) -> dict:
     }
 
 
-def find_top_matches(shard_img: np.ndarray, typology_data=None, top_k: int = 3):
+def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = None):
     """..."""
+
+    if config is None:
+        config = load_config()
+
+    if not typology_data:
+        typology_data = load_typology_data(config)
 
     points_shard = get_points(shard_img)
 
-    if not typology_data:
-        typology_data = load_typology_data()
-
     num_cores = cpu_count()
-    worker_func = partial(match_single_entry, points_shard=points_shard)
+    worker_func = partial(match_single_entry, points_shard=points_shard, config=config)
 
     with Pool(processes=num_cores) as pool:
         candidates = list(pool.imap(worker_func, typology_data.values()))
@@ -112,23 +116,8 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, top_k: int = 3):
     candidates.sort(key=lambda x: x["score"])
 
     # todo: integrate ICP with the top 10 candidates
+
+    top_k = config.get("parameters", {}).get("top_k", 10)
     top_matches = candidates[:top_k]
 
     return top_matches
-
-
-if __name__ == "__main__":
-
-    import time
-
-    start_time = time.time()
-
-    shard_path = "data/processed/shards/10004.png"
-    shard_img = load_image_gray(shard_path)
-
-    top_matches = find_top_matches(shard_img)
-
-    print([match for match in top_matches])
-
-    end_time = time.time()
-    print(f"Time: {end_time - start_time:.2f}")
