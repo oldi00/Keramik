@@ -1,11 +1,10 @@
 import numpy as np
-from pathlib import Path
+import matplotlib.pyplot as plt
 
-# Import your existing modules
-from solver import solve_matching, apply_transformation
-from utils import get_points, get_dist_map
-from visualize import save_heatmap_overlay
-from icp import icp  # The new optimization-based ICP
+from solver import find_top_matches
+from utils import load_image_gray, get_points, apply_transformation, get_dist_map
+from icp import icp
+from visuals import get_match_overlay_fig
 
 
 def params_to_matrix(scale, rotation, translation):
@@ -52,49 +51,25 @@ def matrix_to_params(T):
 
 
 def main():
-    # 1. Setup Paths
-    path_shard = "data/processed/shards/10017.png"  # 10004 10011 10014 10017
-    path_typology = "data/processed/typology/drag33.png"
+    shard_path = "data/processed/shards/10004.png"
+    shard_img = load_image_gray(shard_path)
+    top_matches = find_top_matches(shard_img)
+    points_shard = get_points(shard_img)
 
-    print(f"Loading shard: {path_shard}")
-    print(f"Loading typology: {path_typology}")
+    for i, match in enumerate(top_matches):
+        params = match["params"]
+        typ_path = match["path"]
+        typology_img = load_image_gray(match["path"])
+        points_typology = get_points(typology_img)
+        dist_map = get_dist_map(typology_img)
+        transformed_shard_ransac = apply_transformation(points_shard, *match["params"])
 
-    # 2. Load Data
-    points_shard = get_points(path_shard)
-    points_typology = get_points(path_typology)
-    dist_map = get_dist_map(path_typology)
+        break
 
-    # ---------------------------------------------------------
-    # STEP 3: Run RANSAC (The Solver)
-    # ---------------------------------------------------------
-    print("\n--- Phase 1: Running RANSAC (Coarse Matching) ---")
-    ransac_score, ransac_params = solve_matching(
-        points_shard, points_typology, dist_map, iterations=20000
-    )
-
-    print(f"RANSAC Score (Chamfer): {ransac_score:.4f}")
-    print(
-        f"RANSAC Params: Scale={ransac_params[0]:.2f}, Rot={np.degrees(ransac_params[1]):.2f}°, Trans={ransac_params[2]}"
-    )
-
-    # Visualization 1: RANSAC Result
-    transformed_shard_ransac = apply_transformation(points_shard, *ransac_params)
-    save_heatmap_overlay(
-        path_typology, dist_map, transformed_shard_ransac, "test_result_1_ransac.png"
-    )
-    print("Saved 'test_result_1_ransac.png'")
-
-    # ---------------------------------------------------------
-    # STEP 4: Run ICP (The Optimization)
-    # ---------------------------------------------------------
     print("\n--- Phase 2: Running ICP (Fine Optimization) ---")
 
     # A. Bridge: Convert RANSAC params to Matrix
-    init_pose = params_to_matrix(*ransac_params)
-
-    # B. Run ICP using RANSAC result as starting guess
-    # The ICP will internally decompose this matrix into (r, theta, size, z)
-    # and optimize those specific parameters as per your R logic.
+    init_pose = params_to_matrix(*params)
     final_T, distances, iterations = icp(
         source_points=points_shard,
         target_points=points_typology,
@@ -115,15 +90,15 @@ def main():
         f"Final Params: Scale={final_scale:.2f}, Rot={np.degrees(final_rot):.2f}°, Trans={final_trans}"
     )
 
-    # Visualization 2: Final ICP Result
-    # We reuse apply_transformation since we converted the matrix back to compatible params
     transformed_shard_icp = apply_transformation(
         points_shard, final_scale, final_rot, final_trans
     )
-    save_heatmap_overlay(
-        path_typology, dist_map, transformed_shard_icp, "test_result_2_icp.png"
-    )
-    print("Saved 'test_result_2_icp.png'")
+
+    get_match_overlay_fig(typ_path, dist_map, transformed_shard_ransac)
+    plt.show()
+
+    get_match_overlay_fig(typ_path, dist_map, transformed_shard_icp)
+    plt.show()
 
 
 if __name__ == "__main__":

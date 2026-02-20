@@ -121,7 +121,7 @@ def preprocess_shard(source: SourceType) -> np.ndarray:
     """Clean the shard (SVG) and extract its profile."""
 
     if isinstance(source, (str, Path)):
-        if Path(source) != ".svg":
+        if Path(source).suffix != ".svg":
             logger.warning(f"Skipping '{Path(source).name}': Not an SVG file.")
             return None
 
