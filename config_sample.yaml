@@ -3,3 +3,11 @@ paths:
   shards_clean: "data/processed/shards"
   typology_raw: ""  # Hier den absoluten Pfad zum Cloud-Ordner einfügen.
   typology_clean: "data/processed/typology"
+  typology_cache: "data/cache/typology_features.pkl"
+
+parameters:
+  ransac:
+    min_scale: 0.5
+    max_scale: 1.5
+    max_rotation_deg: 20
+    iterations: 10000

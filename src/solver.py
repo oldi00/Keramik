@@ -1,131 +1,130 @@
-"""
-Implements RANSAC-based geometric alignment to match
-shard points onto the larger typology contour.
-"""
+"""..."""
 
+from utils import get_points, get_dist_map, load_config, load_image_gray, normalize_name
+from ransac import find_coarse_match
+from pathlib import Path
+from multiprocessing import Pool, cpu_count
+from functools import partial
+import pickle
+import logging
 import numpy as np
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-MIN_SCALE = 0.5
-MAX_SCALE = 1.5
-MAX_ROTATION = np.deg2rad(20)
+
+def build_typology_cache(typology_dir: str, cache_file: str) -> None:
+    """Calculate points and distance map for all typology files and store them."""
+
+    Path(cache_file).parent.mkdir(parents=True, exist_ok=True)
+
+    typology_files = list(Path(typology_dir).glob("*.png"))
+
+    if not typology_files:
+        logger.warning(f"No PNG files found in {typology_dir}. Cache will be empty!")
+        return []
+
+    cache = {}
+    for path in typology_files:
+
+        img = load_image_gray(path)
+
+        name_normalized = normalize_name(path.stem)
+        cache[name_normalized] = {
+            "name": name_normalized,
+            "path": str(path),
+            "points": get_points(img),
+            "dist_map": get_dist_map(img),
+        }
+
+    with open(cache_file, "wb") as f:
+        pickle.dump(cache, f)
+
+    logger.info(f"Successfully saved {len(cache)} entries to {cache_file}")
+    return cache
 
 
-def get_transformation(p1, p2, q1, q2):
+def load_typology_data(config: dict) -> None:
     """
-    Calculates the affine transformation (scale, rotation, translation) needed to
-    map two shard points (p1, p2) onto two typology points (q1, q2).
-    """
-
-    vec_p = p2 - p1
-    vec_q = q2 - q1
-
-    len_s = np.linalg.norm(vec_p)
-    len_q = np.linalg.norm(vec_q)
-
-    # Compute the ratio to resize the shard so it matches the
-    # physical scale of the reference typology.
-    scale = len_q / len_s
-
-    angle_p = np.arctan2(vec_p[1], vec_p[0])
-    angle_q = np.arctan2(vec_q[1], vec_q[0])
-
-    # Determine the angle needed to align the shard's orientation with the typology.
-    rotation = angle_q - angle_p
-
-    cos, sin = np.cos(rotation), np.sin(rotation)
-
-    # Calculate the translation to shift the shard so that p1 exactly overlaps with q1.
-    t_x = q1[0] - (scale * (p1[0] * cos - p1[1] * sin))
-    t_y = q1[1] - (scale * (p1[0] * sin + p1[1] * cos))
-
-    return scale, rotation, (t_x, t_y)
-
-
-def apply_transformation(points, scale, rotation, translation):
-    """Apply a transformation to a (N, 2) array of points."""
-
-    p_x, p_y = points[:, 0], points[:, 1]
-    t_x, t_y = translation
-
-    cos, sin = np.cos(rotation), np.sin(rotation)
-
-    # Transform all shard points. Apply scale and rotation
-    # first, then translate to the new position.
-    x = (scale * (p_x * cos - p_y * sin)) + t_x
-    y = (scale * (p_x * sin + p_y * cos)) + t_y
-
-    return np.array([x, y]).T
-
-
-def get_chamfer_score(transformed_points, dist_map, penalty_factor=1):
-    """Computes the Chamfer score with penalties for out-of-bounds points."""
-
-    points_int = np.rint(transformed_points).astype(int)
-
-    p_x = points_int[:, 0]
-    p_y = points_int[:, 1]
-
-    h, w = dist_map.shape
-
-    # Identify which points are inside the distance map bounds.
-    valid_mask = (p_x >= 0) & (p_x < w) & (p_y >= 0) & (p_y < h)
-
-    # Prepare a container with all distances and initialize with the penalty value.
-    penalty_value = np.max(dist_map) * penalty_factor
-    all_distances = np.full(points_int.shape[0], penalty_value)
-
-    # Fill in actual distances for the valid points.
-    if np.any(valid_mask):
-        valid_x = p_x[valid_mask]
-        valid_y = p_y[valid_mask]
-        all_distances[valid_mask] = dist_map[valid_y, valid_x]
-
-    return np.mean(all_distances)
-
-
-def solve_matching(points_shard, points_typology, dist_map, iterations=10000):
-    """
-    Finds the best transformation to align shard points to typology
-    using RANSAC and Chamfer distance.
+    Load typology cache or build cache if path is invalid, cache could
+    not be loaded or cache is outdated.
     """
 
-    best_score, best_params = np.inf, None
+    typology_dir = config["paths"]["typology_clean"]
+    cache_file = config["paths"]["typology_cache"]
 
-    for _ in range(iterations):
+    if not Path(cache_file).exists():
+        logger.info("Cache file not found. Triggering build...")
+        return build_typology_cache(typology_dir, cache_file)
 
-        # Sample 2 random points from each set.
-        p1, p2 = points_shard[np.random.choice(len(points_shard), 2, replace=False)]
-        q1, q2 = points_typology[
-            np.random.choice(len(points_typology), 2, replace=False)
-        ]
+    try:
+        with open(cache_file, "rb") as f:
+            cached_data = pickle.load(f)
+    except (EOFError, pickle.UnpicklingError):
+        logger.warning("Cache file is corrupted or empty. Rebuilding...")
+        return build_typology_cache(typology_dir, cache_file)
 
-        # Prevent division by zero if input data has duplicate coordinates.
-        if np.array_equal(p1, p2) or np.array_equal(q1, q2):
-            continue
+    current_files = {p.name for p in Path(typology_dir).glob("*.png")}
+    cached_files = {Path(item["path"]).name for item in cached_data.values()}
 
-        # Fast Reject: Check if length ratio is within bounds before computing full transform.
-        len_shard = np.linalg.norm(p1 - p2)
-        len_typ = np.linalg.norm(q1 - q2)
-
-        estimated_scale = len_typ / len_shard
-        if not (MIN_SCALE <= estimated_scale <= MAX_SCALE):
-            continue
-
-        scale, rotation, translation = get_transformation(p1, p2, q1, q2)
-
-        # Check rotation bounds (and double-check scale for safety).
-        if scale < MIN_SCALE or scale > MAX_SCALE or abs(rotation) > MAX_ROTATION:
-            continue
-
-        # Heavy operations: Transform all points and compute pixel-wise score.
-        transformed_points_shard = apply_transformation(
-            points_shard, scale, rotation, translation
+    if current_files != cached_files:
+        diff_count = len(current_files.symmetric_difference(cached_files))
+        logger.info(
+            f"Cache is stale ({diff_count} file difference detected). Rebuilding..."
         )
-        score = get_chamfer_score(transformed_points_shard, dist_map)
+        return build_typology_cache(typology_dir, cache_file)
 
-        if score < best_score:
-            best_score = score
-            best_params = (scale, rotation, translation)
+    logger.info(f"Cache is valid. Loaded {len(cached_data)} items.")
+    return cached_data
 
-    return best_score, best_params
+
+def match_single_entry(
+    typology_entry: dict, points_shard: np.ndarray, config: dict
+) -> dict:
+    """Match a single shard against a single typology on a separate CPU core."""
+
+    ransac_params = config["parameters"]["ransac"]
+
+    score, params = find_coarse_match(
+        points_shard,
+        typology_entry["points"],
+        typology_entry["dist_map"],
+        config=ransac_params,
+    )
+
+    return {
+        "name": normalize_name(typology_entry["name"]),
+        "path": typology_entry["path"],
+        "score": score,
+        "params": params,
+    }
+
+
+def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = None):
+    """..."""
+
+    if config is None:
+        config = load_config()
+
+    if not typology_data:
+        typology_data = load_typology_data(config)
+
+    points_shard = get_points(shard_img)
+
+    num_cores = cpu_count()
+    worker_func = partial(match_single_entry, points_shard=points_shard, config=config)
+
+    with Pool(processes=num_cores) as pool:
+        candidates = list(pool.imap(worker_func, typology_data.values()))
+
+    candidates.sort(key=lambda x: x["score"])
+
+    # todo: integrate ICP with the top 10 candidates
+
+    top_k = config.get("parameters", {}).get("top_k", 10)
+    top_matches = candidates[:top_k]
+
+    return top_matches

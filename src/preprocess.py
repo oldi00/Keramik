@@ -1,19 +1,28 @@
 """
 Clean and extract geometric profiles from raw shard and typology scans.
 
-Arguments:
-  -d, --debug        Run in debug mode (process single images only).
-  -o, --overwrite    Force regeneration (delete and recreate output dirs).
-  --only_shards      Process only the shard dataset.
-  --only_typology    Process only the typology dataset.
+Usage:
+    Run as a script to process entire directories:
+    $ python src/preprocessing.py --only_shards
+    $ python src/preprocessing.py --overwrite --debug
+
+    Or import functions to process single images in your app:
+    >>> from src.preprocessing import preprocess_shard
+    >>> profile = preprocess_shard("path/to/shard.svg")
+
+CLI Arguments:
+    -n, --limit N      Process only N images (e.g., -n 5). Useful for testing.
+    -f, --force        Force re-processing even if output file exists.
+    --only_shards      Process only the shard dataset.
+    --only_typology    Process only the typology dataset.
 """
 
-from utils import load_config, create_dir
-import tempfile
-import argparse
+from utils import load_config, load_image_gray, create_dir, crop_to_content
+from typing import Union, BinaryIO
 import logging
-import cv2
+import argparse
 import cairosvg
+import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -32,72 +41,47 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+SourceType = Union[str, Path, BinaryIO]
 
-def clean_shard(img_path: Path, output_dir: Path) -> None:
-    """Remove ID and scale from the raw SVG image and rename file."""
 
-    namespace = "{http://www.w3.org/2000/svg}"
+def remove_artifacts(svg_source: SourceType) -> bytes:
+    """Remove artifacts (ID, scale, etc.) from the given shard SVG."""
 
-    tree = ET.parse(img_path)
+    tree = ET.parse(svg_source)
     root = tree.getroot()
 
-    # Find and remove ID/scale via specific SVG tags.
-    for child in list(root):
-        if child.tag in [f"{namespace}text", f"{namespace}rect"]:
-            root.remove(child)
+    namespace = "{http://www.w3.org/2000/svg}"
+    tags_to_remove = ["image", "text", "rect", f"{namespace}image", f"{namespace}text"]
 
-    clean_name = img_path.name.replace("recons_", "")
+    for parent in tree.iter():
+        for child in list(parent):
+            if any(tag in child.tag for tag in tags_to_remove):
+                parent.remove(child)
 
-    output_path = Path(output_dir) / clean_name
-    tree.write(output_path)
-
-
-def convert_svg2png(img_path: Path, output_dir: Path) -> None:
-    """
-    Convert the given SVG image to PNG format.
-    Follow instruction on CairoSVG website (https://cairosvg.org/) to
-    ensure this functions works with no issues.
-    """
-
-    out_path = output_dir / f"{img_path.stem}.png"
-
-    try:
-
-        tree = ET.parse(img_path)
-        root = tree.getroot()
-
-        for parent in tree.iter():
-            for child in list(parent):
-                if "image" in child.tag:
-                    parent.remove(child)
-                    logger.debug(f"Removed embedded image from {img_path.name}")
-
-        clean_svg_string = ET.tostring(root, encoding="utf-8")
-
-        cairosvg.svg2png(
-            bytestring=clean_svg_string,
-            write_to=str(out_path),
-            background_color="white",
-            scale=2.0,
-        )
-        return out_path
-
-    except Exception:
-        logger.warning(f"Failed to convert '{img_path.name}' into PNG format.")
+    return ET.tostring(root, encoding="utf-8")
 
 
-def get_profile_shard(img_path: Path):
-    """Extract the profile (left side) from the given shard image as a single-line contour."""
+def convert_svg2array(svg_bytes: bytes) -> np.ndarray:
+    """Convert SVG bytes into a numpy array."""
 
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    png_bytes = cairosvg.svg2png(
+        bytestring=svg_bytes, write_to=None, scale=2.0, background_color="white"
+    )
+
+    img_array = np.frombuffer(png_bytes, np.uint8)
+
+    return cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
+
+
+def get_profile(img: np.ndarray) -> np.ndarray:
+    """Extract the outer contour (profile) of the given shard image."""
+
     _, img_binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
 
     kernel = np.ones((5, 5), np.uint8)
+    morph = cv2.morphologyEx(img_binary, cv2.MORPH_OPEN, kernel, iterations=2)
 
-    thresh_clean = cv2.morphologyEx(img_binary, cv2.MORPH_OPEN, kernel, iterations=2)
-    contours, _ = cv2.findContours(
-        thresh_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
+    contours, _ = cv2.findContours(morph, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
     largest_contour = max(contours, key=cv2.contourArea)
 
@@ -107,181 +91,136 @@ def get_profile_shard(img_path: Path):
     return profile
 
 
-def get_skeleton(img_path, output_dir):
+def get_skeleton(img: np.ndarray) -> np.ndarray:
     """Compute the skeleton of the given image."""
 
-    file_bytes = np.fromfile(str(img_path), dtype=np.uint8)
-    img = cv2.imdecode(file_bytes, cv2.IMREAD_GRAYSCALE)
+    blur = cv2.GaussianBlur(img, (5, 5), 0)
 
-    blurred = cv2.GaussianBlur(img, (5, 5), 0)
-
-    _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+    _, binary = cv2.threshold(blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
 
     skeleton = cv2.ximgproc.thinning(
         binary, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN
     )
-
     skeleton = cv2.bitwise_not(skeleton)
 
-    out_path = Path(output_dir) / Path(img_path).name
-    cv2.imwrite(out_path, skeleton)
+    return skeleton
 
 
-def crop_typology(img_path, output_dir):
+def crop_typology(img: np.ndarray) -> np.ndarray:
     """Crop the given typology image to the upper-left corner."""
-
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
 
     h, w = img.shape
 
     crop = img[:, : int(w * 0.45)]
     crop = crop[: int(h * 0.75), :]
 
-    out_path = Path(output_dir) / Path(img_path).name
-    cv2.imwrite(out_path, crop)
+    return crop
 
 
-def preprocess_shards(debug: bool) -> None:
+def preprocess_shard(source: SourceType) -> np.ndarray:
+    """Clean the shard (SVG) and extract its profile."""
+
+    if isinstance(source, (str, Path)):
+        if Path(source) != ".svg":
+            logger.warning(f"Skipping '{Path(source).name}': Not an SVG file.")
+            return None
+
+    clean_svg = remove_artifacts(source)
+
+    img_array = convert_svg2array(clean_svg)
+
+    profile = get_profile(img_array)
+    profile = crop_to_content(profile)
+
+    return profile
+
+
+def preprocess_typology(typology_path: str) -> np.ndarray:
+    """Extract skeleton and crop the typology image."""
+
+    path_obj = Path(typology_path)
+
+    if path_obj.suffix not in [".png", ".jpg", ".jpeg", ".svg"]:
+        logger.warning(f"Skipping '{path_obj.name}': Not an image file.")
+        return None
+
+    if path_obj.suffix == ".svg":
+        clean_svg = remove_artifacts(typology_path)
+        img_array = convert_svg2array(clean_svg)
+    else:
+        img_array = load_image_gray(typology_path)
+
+    if np.all(img_array == 0) or np.all(img_array == 255):
+        logger.warning(f"Skipping '{path_obj.name}': Image is pure white/black.")
+        return None
+
+    skeleton = get_skeleton(img_array)
+    skeleton = crop_to_content(skeleton)
+
+    return skeleton
+
+
+def preprocess_batch(batch_type: str, limit: int = None, force: bool = False) -> None:
     """
-    Standardize raw shards for model training.
+    Process a batch of images (either shards or typologies).
 
-    The pipeline follows these steps:
-    - Clean the raw SVG images (remove artifacts and rename)
-    - Convert cleaned SVG images into PNG format
-    - Extract profile from cleaned PNG images
-    """
+    Skips images that already exist in the output directory unless 'force' is True.
 
-    temp_dir = tempfile.TemporaryDirectory()
-    temp_path = Path(temp_dir.name)
-
-    temp_dir_clean_svg = temp_path / "clean_svg"
-    temp_dir_clean_svg.mkdir()
-
-    temp_dir_clean_png = temp_path / "clean_png"
-    temp_dir_clean_png.mkdir()
-
-    # Remove non-relevant artifacts (IDs, scale) from raw SVGs so the model can focus on geometry.
-    for svg_path in tqdm(
-        list(DIR_SHARDS_RAW.iterdir()), desc="Clean Shards", unit="img"
-    ):
-        clean_shard(svg_path, temp_dir_clean_svg)
-        if debug:
-            break
-
-    # Transform clean SVGs to PNG format since it is easier to work with later.
-    for svg_path in tqdm(
-        list(temp_dir_clean_svg.iterdir()), desc="Convert SVGs", unit="img"
-    ):
-        if not (temp_dir_clean_png / f"{svg_path.stem}.png").exists():
-            convert_svg2png(svg_path, temp_dir_clean_png)
-        if debug:
-            break
-
-    # Extract the profile (left side) from each shard.
-    shard_paths = list(temp_dir_clean_png.iterdir())
-    for shard_path in tqdm(shard_paths, desc="Extract Shard Profiles", unit="img"):
-
-        profile = get_profile_shard(shard_path)
-
-        save_path = Path(DIR_SHARDS_CLEAN) / Path(shard_path).name
-        cv2.imwrite(str(save_path), profile)
-
-        if debug:
-            break
-
-    temp_dir.cleanup()
-
-
-def preprocess_typology(debug: bool) -> None:
-    """
-    Clean and standardize typology snapshots for model training.
-
-    The pipeline follows these steps:
-    - Compute the skeletons for the typology images
-    - Crop the skeleton images
+    Args:
+        batch_type (str): Must be 'shard' or 'typology'.
+        limit (int): If set, stops processing after N images (useful for testing).
+        force (bool): If True, re-processes images even if they already exist.
     """
 
-    temp_dir = tempfile.TemporaryDirectory()
-    temp_path = Path(temp_dir.name)
+    if batch_type == "shard":
+        input_dir = DIR_SHARDS_RAW
+        output_dir = DIR_SHARDS_CLEAN
+        process_func = preprocess_shard
+        valid_suffixes = {".svg"}
+    elif batch_type == "typology":
+        input_dir = DIR_TYPOLOGY_RAW
+        output_dir = DIR_TYPOLOGY_CLEAN
+        process_func = preprocess_typology
+        valid_suffixes = {".png", ".jpg", ".jpeg", ".svg"}
+    else:
+        raise ValueError(f"Unknown batch_type: {batch_type}")
 
-    temp_dir_converted = temp_path / "converted_pngs"
-    temp_dir_converted.mkdir()
+    create_dir(output_dir, force)
 
-    temp_dir_skeletons = temp_path / "skeletons"
-    temp_dir_skeletons.mkdir()
+    files = [
+        p
+        for p in input_dir.rglob("*")
+        if p.is_file() and p.suffix.lower() in valid_suffixes
+    ]
+    files_to_process = files[:limit] if limit else files
 
-    # Compute the skeleton to get clean, single-pixel geometric paths.
-    typ_paths = [p for p in DIR_TYPOLOGY_RAW.rglob("*") if p.is_file()]
-    for typ_path in tqdm(typ_paths, desc="Get Skeletons", unit="img"):
-        # ! temporary fix
-        umlauts = ["ä", "ö", "ü", "Ä", "Ö", "Ü", "ß"]
-        valid_extensions = {".jpg", ".jpeg", ".png", ".svg"}
-        if (
-            typ_path.name.startswith(".")
-            or any(x in typ_path.name for x in umlauts)
-            or typ_path.suffix.lower() not in valid_extensions
-        ):
+    descr = f"Preprocessing {batch_type.title()} Batch"
+    for file_path in tqdm(files_to_process, unit="img", desc=descr):
+
+        save_name = f"{file_path.stem}.png".replace("recons_", "")
+        save_path = output_dir / save_name
+
+        if save_path.exists() and not force:
             continue
 
-        processing_path = typ_path
-
-        if typ_path.suffix.lower() == ".svg":
-            convert_svg2png(typ_path, temp_dir_converted)
-            processing_path = temp_dir_converted / f"{typ_path.stem}.png"
-
-        get_skeleton(processing_path, temp_dir_skeletons)
-        if debug:
-            break
-
-    # Crop the typology images since only the upper-left side is relevant.
-    for typ_path in tqdm(
-        list(temp_dir_skeletons.iterdir()), desc="Crop Typology", unit="img"
-    ):
-        crop_typology(typ_path, DIR_TYPOLOGY_CLEAN)
-        if debug:
-            break
-
-    temp_dir.cleanup()
+        try:
+            result_img = process_func(str(file_path))
+            if result_img is not None:
+                cv2.imwrite(str(save_path), result_img)
+        except Exception:
+            logger.warning(f"Skipping {file_path.name}: Preprocessing failed.")
 
 
-def get_args():
+def main():
 
-    parser = argparse.ArgumentParser(
-        description="Clean and extract geometric profiles from raw shard and typology scans."
-    )
+    parser = argparse.ArgumentParser()
 
-    parser.add_argument(
-        "-d",
-        "--debug",
-        action="store_true",
-        help="Run in debug mode: Process only a single shard and typology image for testing.",
-    )
+    parser.add_argument("-n", "--limit", type=int)
+    parser.add_argument("-f", "--force", action="store_true")
+    parser.add_argument("--only_shards", action="store_true")
+    parser.add_argument("--only_typology", action="store_true")
 
-    parser.add_argument(
-        "-o",
-        "--overwrite",
-        action="store_true",
-        help="Force regeneration: Delete and re-create all output directories from scratch.",
-    )
-
-    parser.add_argument(
-        "--only_shards", action="store_true", help="Process only the shard dataset."
-    )
-
-    parser.add_argument(
-        "--only_typology",
-        action="store_true",
-        help="Process only the typology dataset.",
-    )
-
-    return parser.parse_args()
-
-
-def main(args):
-
-    if args.debug and args.overwrite:
-        logger.warning("Debug mode enabled. Disabling overwrite to protect data.")
-        args.overwrite = False
+    args = parser.parse_args()
 
     if not args.only_shards and not args.only_typology:
         process_shards = True
@@ -291,13 +230,11 @@ def main(args):
         process_typology = args.only_typology
 
     if process_shards:
-        create_dir(DIR_SHARDS_CLEAN, args.overwrite)
-        preprocess_shards(args.debug)
+        preprocess_batch("shard", args.limit, args.force)
 
     if process_typology:
-        create_dir(DIR_TYPOLOGY_CLEAN, args.overwrite)
-        preprocess_typology(args.debug)
+        preprocess_batch("typology", args.limit, args.force)
 
 
 if __name__ == "__main__":
-    main(get_args())
+    main()
