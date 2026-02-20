@@ -73,7 +73,7 @@ def save_heatmap_overlay(typ_path, dist_map, points, out_path):
 
     img_typ = cv2.imread(typ_path, cv2.IMREAD_GRAYSCALE)
     img_typ = cv2.erode(img_typ, np.ones((3, 3), np.uint8))
-    ax.imshow(img_typ, cmap='gray', origin='upper', alpha=0.5)
+    ax.imshow(img_typ, cmap="gray", origin="upper", alpha=0.5)
 
     points_int = np.rint(points).astype(int)
     h, w = dist_map.shape
@@ -85,15 +85,18 @@ def save_heatmap_overlay(typ_path, dist_map, points, out_path):
         dists.append(val)
 
     ax.scatter(
-        points[:, 0], points[:, 1],
-        c=dists, cmap='RdYlGn_r',
-        edgecolors='none',
-        vmin=0, vmax=30,
+        points[:, 0],
+        points[:, 1],
+        c=dists,
+        cmap="RdYlGn_r",
+        edgecolors="none",
+        vmin=0,
+        vmax=30,
     )
 
-    plt.axis('off')
+    plt.axis("off")
     plt.tight_layout()
-    plt.savefig(out_path, dpi=150, bbox_inches='tight')
+    plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -145,14 +148,14 @@ def create_ransac_gif(path_typology, path_shard, out_gif_path, n_frames=50):
             best_score = score
 
         fig, ax = plt.subplots(figsize=(6, 6))
-        ax.imshow(dist_map, cmap='gray_r', origin='upper')
+        ax.imshow(dist_map, cmap="gray_r", origin="upper")
 
         if is_best:
-            color = '#00ff00'
+            color = "#00ff00"
             alpha = 1.0
             marker_size = 25
         else:
-            color = '#ff0040'
+            color = "#ff0040"
             alpha = 0.5
             marker_size = 10
 
@@ -160,16 +163,16 @@ def create_ransac_gif(path_typology, path_shard, out_gif_path, n_frames=50):
             "c": color,
             "s": marker_size,
             "alpha": alpha,
-            "edgecolors": 'none'
+            "edgecolors": "none",
         }
 
         ax.scatter(t_points[:, 0], t_points[:, 1], **scatter_config)
         ax.set_xlim(0, w)
         ax.set_ylim(h, 0)
-        ax.axis('off')
+        ax.axis("off")
 
         buf = io.BytesIO()
-        plt.savefig(buf, format='png', bbox_inches='tight', dpi=80)
+        plt.savefig(buf, format="png", bbox_inches="tight", dpi=80)
         buf.seek(0)
 
         img = imageio.imread(buf)
@@ -193,6 +196,6 @@ if __name__ == "__main__":
         "path_typology": "data/preprocess/typology_crops/drag33.png",
         "path_shard": "data/preprocess/shards_profiles/10004.png",  # Beispiel ID
         "out_gif_path": "data/results/visualizations/ransac.gif",
-        "n_frames": 20
+        "n_frames": 20,
     }
     create_ransac_gif(**gif_config)
