@@ -27,6 +27,7 @@ import numpy as np
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from tqdm import tqdm
+from tqdm.contrib.logging import logging_redirect_tqdm
 
 CONFIG = load_config()
 
@@ -189,20 +190,21 @@ def preprocess_batch(batch_type: str, limit: int = None, force: bool = False) ->
     files_to_process = files[:limit] if limit else files
 
     descr = f"Preprocessing {batch_type.title()} Batch"
-    for file_path in tqdm(files_to_process, unit="img", desc=descr):
+    with logging_redirect_tqdm():
+        for file_path in tqdm(files_to_process, unit="img", desc=descr):
 
-        save_name = f"{file_path.stem}.png".replace("recons_", "")
-        save_path = output_dir / save_name
+            save_name = f"{file_path.stem}.png".replace("recons_", "")
+            save_path = output_dir / save_name
 
-        if save_path.exists() and not force:
-            continue
+            if save_path.exists() and not force:
+                continue
 
-        try:
-            result_img = process_func(str(file_path))
-            if result_img is not None:
-                cv2.imwrite(str(save_path), result_img)
-        except Exception:
-            logger.warning(f"Skipping {file_path.name}: Preprocessing failed.")
+            try:
+                result_img = process_func(str(file_path))
+                if result_img is not None:
+                    cv2.imwrite(str(save_path), result_img)
+            except Exception:
+                logger.warning(f"Skipping {file_path.name}: Preprocessing failed.")
 
 
 def main():

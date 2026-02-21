@@ -1,7 +1,8 @@
 """..."""
 
-from src.utils import get_points, get_dist_map, load_config, load_image_gray, normalize_name
-from src.ransac import find_coarse_match
+from src.ransac import ransac
+from src.icp import icp
+import src.utils as utils
 from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from functools import partial
@@ -27,14 +28,14 @@ def build_typology_cache(typology_dir: str, cache_file: str) -> None:
     cache = {}
     for path in typology_files:
 
-        img = load_image_gray(path)
+        img = utils.load_image_gray(path)
 
-        name_normalized = normalize_name(path.stem)
+        name_normalized = utils.normalize_name(path.stem)
         cache[name_normalized] = {
             "name": name_normalized,
             "path": str(path),
-            "points": get_points(img),
-            "dist_map": get_dist_map(img)
+            "points": utils.get_points(img),
+            "dist_map": utils.get_dist_map(img)
         }
 
     with open(cache_file, "wb") as f:
@@ -79,17 +80,15 @@ def load_typology_data(config: dict) -> None:
 def match_single_entry(typology_entry: dict, points_shard: np.ndarray, config: dict) -> dict:
     """Match a single shard against a single typology on a separate CPU core."""
 
-    ransac_params = config["parameters"]["ransac"]
-
-    score, params = find_coarse_match(
+    score, params = ransac(
         points_shard,
         typology_entry["points"],
         typology_entry["dist_map"],
-        config=ransac_params
+        config=config
     )
 
     return {
-        "name": normalize_name(typology_entry["name"]),
+        "name": utils.normalize_name(typology_entry["name"]),
         "path": typology_entry["path"],
         "score": score,
         "params": params,
@@ -100,24 +99,56 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
     """..."""
 
     if config is None:
-        config = load_config()
+        config = utils.load_config()
+
+    ransac_config = config["parameters"]["ransac"]
+    icp_config = config["parameters"]["icp"]
 
     if not typology_data:
         typology_data = load_typology_data(config)
 
-    points_shard = get_points(shard_img)
+    points_shard = utils.get_points(shard_img)
 
     num_cores = cpu_count()
-    worker_func = partial(match_single_entry, points_shard=points_shard, config=config)
+    worker_func = partial(match_single_entry, points_shard=points_shard, config=ransac_config)
 
     with Pool(processes=num_cores) as pool:
         candidates = list(pool.imap(worker_func, typology_data.values()))
 
     candidates.sort(key=lambda x: x["score"])
 
-    # todo: integrate ICP with the top 10 candidates
+    # todo: integrate this parameter into config?
+    candidates = candidates[:10]
+
+    top_matches = []
+    for candidate in candidates:
+
+        typology_name = candidate["name"]
+        ransac_params = candidate["params"]
+        points_typology = typology_data[typology_name]["points"]
+
+        init_pose = utils.params_to_matrix(*ransac_params)
+        final_T, distances, _ = icp(
+            source_points=points_shard,
+            target_points=points_typology,
+            init_pose=init_pose,
+            max_iterations=icp_config["max_iterations"],
+            tolerance=icp_config["tolerance"],
+        )
+
+        mean_icp_error = np.mean(distances)
+        icp_params = utils.matrix_to_params(final_T)
+
+        top_matches.append({
+            "name": typology_name,
+            "ransac_score": candidate["score"],
+            "icp_error": mean_icp_error,
+            "params": icp_params,
+        })
+
+    top_matches.sort(key=lambda x: x["icp_error"])
 
     top_k = config.get("parameters", {}).get("top_k", 10)
-    top_matches = candidates[:top_k]
+    top_matches = top_matches[:top_k]
 
     return top_matches

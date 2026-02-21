@@ -137,3 +137,45 @@ def crop_to_content(img, padding=8):
     y_end = min(img_h, y + h + padding)
 
     return img[y_start:y_end, x_start:x_end]
+
+
+def params_to_matrix(scale, rotation, translation):
+    """
+    Convert (scale, rotation, translation) tuple
+    into a 3x3 Homogeneous Transformation Matrix for ICP.
+    """
+
+    c, s = np.cos(rotation), np.sin(rotation)
+    tx, ty = translation
+
+    # Construct standard similarity matrix
+    # [ s*cos  -s*sin   tx ]
+    # [ s*sin   s*cos   ty ]
+    # [   0       0      1 ]
+    T = np.eye(3)
+    T[0, 0] = scale * c
+    T[0, 1] = -scale * s
+    T[0, 2] = tx
+    T[1, 0] = scale * s
+    T[1, 1] = scale * c
+    T[1, 2] = ty
+
+    return T
+
+
+def matrix_to_params(T):
+    """Decompose a 3x3 Matrix back into (scale, rotation, translation)."""
+
+    # 1. Translation is the last column
+    tx = T[0, 2]
+    ty = T[1, 2]
+
+    # 2. Scale is the magnitude of the first column vector
+    # col0 = [s*cos, s*sin]
+    sx = np.sqrt(T[0, 0] ** 2 + T[1, 0] ** 2)
+
+    # 3. Rotation is atan2 of the rotation components
+    # The scale cancels out in atan2
+    rotation = np.arctan2(T[1, 0], T[0, 0])
+
+    return sx, rotation, (tx, ty)

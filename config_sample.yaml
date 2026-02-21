@@ -6,8 +6,12 @@ paths:
   typology_cache: "data/cache/typology_features.pkl"
 
 parameters:
+  top_k: 3
   ransac:
+    iterations: 50000
     min_scale: 0.5
     max_scale: 1.5
-    max_rotation_deg: 20
-    iterations: 10000
+    max_rotation_deg: 8
+  icp:
+    max_iterations: 100
+    tolerance: 1e-6

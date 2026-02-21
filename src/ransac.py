@@ -96,7 +96,7 @@ def score_survivors(points_shard, dist_map, scale, rotation, t_x, t_y):
     return base_score + y_penalty
 
 
-def find_coarse_match(points_shard, points_typology, dist_map, config):
+def ransac(points_shard, points_typology, dist_map, config):
     """Execute RANSAC pipeline to identify the best geometric alignment."""
 
     idx_p, idx_q = generate_batch_indices(
