@@ -1,7 +1,7 @@
 """..."""
 
-from utils import get_points, get_dist_map, load_config, load_image_gray, normalize_name
-from ransac import find_coarse_match
+from src.utils import get_points, get_dist_map, load_config, load_image_gray, normalize_name
+from src.ransac import find_coarse_match
 from pathlib import Path
 from multiprocessing import Pool, cpu_count
 from functools import partial

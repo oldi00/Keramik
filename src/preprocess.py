@@ -17,7 +17,7 @@ CLI Arguments:
     --only_typology    Process only the typology dataset.
 """
 
-from utils import load_config, load_image_gray, create_dir, crop_to_content
+from src.utils import load_config, load_image_gray, create_dir, crop_to_content
 from typing import Union, BinaryIO
 import logging
 import argparse
