@@ -24,7 +24,12 @@ def get_match_overlay(typ_path, dist_map, points):
 
     pts = points.reshape(-1, 1, 2)
     segments = np.concatenate([pts[:-1], pts[1:]], axis=1)
-    segment_colors = (dists_np[:-1] + dists_np[1:]) / 2.0
+
+    diffs = np.linalg.norm(pts[1:] - pts[:-1], axis=2).flatten()
+    mask = diffs < 5  # Adjust '15' based on your average 'step' size
+
+    segments = segments[mask]
+    segment_colors = ((dists_np[:-1] + dists_np[1:]) / 2.0)[mask]
 
     outline = LineCollection(
         segments, colors='black', linewidths=3, alpha=0.8,

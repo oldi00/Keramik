@@ -30,14 +30,18 @@ def load_image_gray(img_path):
 def load_config(config_path="config.yaml"):
     """Load a YAML config file based on the given path."""
 
-    with open(config_path, "r", encoding='utf-8') as file:
-        config = yaml.safe_load(file)
+    try:
+        with open(config_path, "r", encoding='utf-8') as file:
+            config = yaml.safe_load(file)
 
-    # Convert strings to Path objects automatically.
-    for key, val in config['paths'].items():
-        config['paths'][key] = Path(val)
+        # Convert strings to Path objects automatically.
+        for key, val in config['paths'].items():
+            config['paths'][key] = Path(val)
 
-    return config
+        return config
+
+    except Exception:
+        return None
 
 
 def safe_to_delete(dir_path: str) -> bool:
@@ -191,8 +195,8 @@ def matrix_to_params(T):
     return sx, rotation, (tx, ty)
 
 
-def drop_bottom(points: np.ndarray, drop_ratio: float = 0.10) -> np.ndarray:
-    """Drop the bottom points relative to the object's actual orientation."""
+def remove_shard_base(points: np.ndarray, drop_ratio: float = 0.10) -> np.ndarray:
+    """Remove the base points relative to the object's actual orientation."""
 
     # 1. Center the points around the origin
     mean = np.mean(points, axis=0)

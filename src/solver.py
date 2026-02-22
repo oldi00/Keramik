@@ -102,8 +102,8 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
         typology_data = load_typology_data(config)
 
     points_shard = utils.get_points(shard_img)
-    if config["parameters"]["drop_bottom"]:
-        points_shard = utils.drop_bottom(points_shard)
+    if config["parameters"]["remove_shard_base"]:
+        points_shard = utils.remove_shard_base(points_shard)
 
     # --- RANSAC ---
 

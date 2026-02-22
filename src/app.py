@@ -8,9 +8,8 @@ Use the below command to start the app:
 from src.solver import load_typology_data, find_top_matches
 from src.preprocess import preprocess_shard
 from src.visuals import get_match_overlay
-from src.utils import load_config, apply_transformation, get_points
+from src.utils import load_config, apply_transformation, get_points, remove_shard_base
 import streamlit as st
-import cv2
 
 st.set_page_config(page_title="Keramik Challenge", layout="wide")
 
@@ -68,6 +67,9 @@ def render_match_tab(match, i, typology_data):
         shard_img = match["shard_img"]
         shard_points = get_points(shard_img, step=1)
 
+        if config["parameters"]["remove_shard_base"]:
+            shard_points = remove_shard_base(shard_points)
+
         if show_ransac:
             shard_points = apply_transformation(shard_points, *match["ransac_params"])
         else:
@@ -116,14 +118,9 @@ with st.sidebar:
             value=config["parameters"]["top_k"],
         )
 
-        config_ransac["squared_dist_map"] = st.checkbox(
-            label="Use Squared Distance Map",
-            value=config_ransac["squared_dist_map"],
-        )
-
-        config["parameters"]["drop_bottom"] = st.checkbox(
-            label="Drop Bottom of Shard",
-            value=config["parameters"]["drop_bottom"],
+        config["parameters"]["remove_shard_base"] = st.checkbox(
+            label="Remove Shard Base",
+            value=config["parameters"]["remove_shard_base"],
         )
 
     with form.expander("RANSAC Parameters", expanded=True):
@@ -161,6 +158,11 @@ with st.sidebar:
             min_value=0,
             max_value=15,
             value=config_ransac["max_rotation_deg"],
+        )
+
+        config_ransac["squared_dist_map"] = st.checkbox(
+            label="Use Squared Distance Map",
+            value=config_ransac["squared_dist_map"],
         )
 
     with form.expander("ICP Parameters", expanded=True):
@@ -202,7 +204,29 @@ st.caption("Upload a shard profile to find the closest matches in the typology d
 user_file = st.file_uploader("Upload a shard:", type="svg")
 
 if not user_file:
-    # todo: add a welcome message
+    st.markdown(
+        """
+        #### Quick Start Guide
+        This interactive tool allows you to upload an `.svg` profile of a ceramic shard and uses
+        RANSAC and ICP alignment algorithms to find its closest match in the typology database.
+
+        **Important Prerequisites:** For the pipeline to run successfully, please ensure you have
+        completed the following steps:
+
+        1. **Check the README:** Follow all environment setup and installation instructions
+        located in the main repository.
+        2. **Preprocess the Data:** You must generate the required distance maps and typology
+        assets by running the terminal command:
+        ```bash
+        python preprocess.py --only_typology
+
+        ```
+
+        Hint: During the first run, the app needs to load and index the entire typology database
+        into memory. This may take a few moments. Once the data is cached, subsequent searches and
+        parameter adjustments will be significantly faster.
+        """
+    )
     st.stop()
 
 typology_data = get_cached_typology_data(config)

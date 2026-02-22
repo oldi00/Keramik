@@ -7,7 +7,7 @@ paths:
 
 parameters:
   top_k: 3
-  drop_bottom: true
+  remove_shard_base: true
   ransac:
     iterations: 50000
     min_scale: 0.5
