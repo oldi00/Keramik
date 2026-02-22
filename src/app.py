@@ -1,300 +1,221 @@
+"""
+Run a streamlit app to interact with the core algorithms via a web interface.
+
+Use the below command to start the app:
+>>> streamlit run src/app.py
+"""
+
+from src.solver import load_typology_data, find_top_matches
+from src.preprocess import preprocess_shard
+from src.visuals import get_match_overlay
+from src.utils import load_config, apply_transformation
 import streamlit as st
-from PIL import Image
-import numpy as np
-import cv2
-import tempfile
-import os
-from pathlib import Path
-import matplotlib.pyplot as plt
 
-# --- Imports aus den eigenen Modulen ---
-# Wir fügen das aktuelle Verzeichnis zum Pfad hinzu, damit Module gefunden werden
-import sys
-
-sys.path.append(str(Path(__file__).parent))
-
-from geometric_matching import utils, solver
-
-# --- CONFIG ---
-st.set_page_config(
-    page_title="Keramik",
-    page_icon="🏺",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
-# Pfad zu den vorverarbeiteten Typologie-Daten (Crops)
-# Passen Sie diesen Pfad ggf. an Ihre Ordnerstruktur an (relativ zum Root)
-TYPOLOGY_FOLDER = Path("data/preprocess/typology_crops")
-
-# --- STYLES ---
-st.markdown(
-    """
-    <style>
-    .main { background-color: #fcfcfc; }
-    .stMetric { background-color: #f0f2f6; padding: 10px; border-radius: 5px; border: 1px solid #e0e0e0; }
-    img { border: 1px solid #ddd; border-radius: 4px; }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-# --- HELPER FUNCTIONS ---
+st.set_page_config(page_title="Keramik Challenge", layout="wide")
 
 
-@st.cache_resource
-def load_typology_db():
-    """Lädt die Referenz-Datenbank (Typologien) einmalig in den Cache."""
-    typology = {}
+# --- CACHED FUNCTIONS ---
 
-    if not TYPOLOGY_FOLDER.exists():
-        st.error(
-            f"Typologie-Ordner nicht gefunden: {TYPOLOGY_FOLDER}. Bitte stellen Sie sicher, dass 'preprocess.py' ausgeführt wurde."
+@st.cache_data(show_spinner=False)
+def get_cached_config():
+    return load_config()
+
+
+@st.cache_data(show_spinner=False)
+def get_cached_typology_data(config):
+    return load_typology_data(config)
+
+
+@st.cache_data(show_spinner=False)
+def get_cached_top_matches(profile, typology_data, config):
+    return find_top_matches(profile, typology_data, config)
+
+
+@st.cache_data(show_spinner=False)
+def get_cached_overlay(typ_path, dist_map, points):
+    return get_match_overlay(typ_path, dist_map, points)
+
+
+# --- FRAGMENT FUNCTIONS ---
+
+@st.fragment
+def render_match_tab(match, i, typology_data):
+
+    col1, col2 = st.columns([3, 2], gap="large")
+
+    with col2:
+
+        # todo: connect to real metadata?
+
+        st.header(f"**{match['name']}**")
+        st.caption("Reference: Fasold, *Typentafel* (Page 10)")
+
+        m_col1, m_col2 = st.columns(2)
+        m_col1.metric("ICP Error", f"{match.get('icp_error', 0.0):.2f}")
+        m_col2.metric("RANSAC Score", f"{match.get('ransac_score', 0.0):.2f}")
+
+        show_ransac = st.toggle(
+            "Show RANSAC Overlay",
+            value=False,
+            key=f"toggle_{i}",
+            help="Toggle between ICP (default) and RANSAC alignment visualizations."
         )
-        return {}
+        st.button("Save Overlay", key=f"button_{i}", type="primary", width="stretch")
 
-    # Alle PNGs im Typologie-Ordner durchsuchen
-    files = list(TYPOLOGY_FOLDER.rglob("*.png"))
+    with col1:
 
-    for typ_path in files:
-        # Punkte und Distanzkarte vorberechnen
-        points = utils.get_points(str(typ_path))
-        dist_map = utils.get_dist_map(str(typ_path))
+        points_shard = match["points_shard"]
+        typ_name = match["name"]
 
-        name = utils.normalize_name(typ_path.stem)
+        typ_path = typology_data[typ_name]["path"]
+        dist_map = typology_data[typ_name]["dist_map"]
 
-        typology[name] = {
-            "points": points,
-            "dist_map": dist_map,
-            "path": str(typ_path),
-            "display_name": typ_path.stem,  # Originaler Name für Anzeige
-        }
+        if not show_ransac:
+            icp_points = apply_transformation(points_shard, *match["icp_params"])
+            overlay = get_cached_overlay(typ_path, dist_map, icp_points)
+        else:
+            # todo: add ransac legend?
+            ransac_points = apply_transformation(points_shard, *match["ransac_params"])
+            overlay = get_cached_overlay(typ_path, dist_map, ransac_points)
 
-    return typology
-
-
-def preprocess_uploaded_image(uploaded_file):
-    """
-    Speichert den Upload temporär, extrahiert das Profil (wie in preprocess.py)
-    und gibt den Pfad zum verarbeiteten Bild zurück.
-    """
-    # 1. Temporäre Datei für den Upload erstellen
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_raw:
-        tmp_raw.write(uploaded_file.getvalue())
-        raw_path = tmp_raw.name
-
-    # 2. Profil extrahieren (Logik aus preprocess.py -> extract_profile_shard)
-    # Wir machen das hier direkt mit OpenCV, um File-IO zu minimieren,
-    # speichern das Ergebnis aber, da utils.get_points einen Pfad erwartet.
-    img = cv2.imread(raw_path, cv2.IMREAD_GRAYSCALE)
-
-    # Binarisierung & Cleaning
-    _, img_binary = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
-    kernel = np.ones((5, 5), np.uint8)
-    thresh_clean = cv2.morphologyEx(img_binary, cv2.MORPH_OPEN, kernel, iterations=2)
-
-    # Kontur finden
-    contours, _ = cv2.findContours(
-        thresh_clean, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-    )
-
-    if not contours:
-        return None, None
-
-    largest_contour = max(contours, key=cv2.contourArea)
-
-    # Neues Bild erstellen (weißer Hintergrund, schwarze Kontur)
-    shard_profile = np.ones_like(img) * 255
-    cv2.drawContours(shard_profile, [largest_contour], -1, (0, 0, 0), thickness=1)
-
-    # 3. Profil-Bild temporär speichern
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp_profile:
-        cv2.imwrite(tmp_profile.name, shard_profile)
-        profile_path = tmp_profile.name
-
-    # Bereinigen: Raw File löschen
-    os.remove(raw_path)
-
-    return profile_path, shard_profile
-
-
-def create_heatmap_figure(typ_path, dist_map, transformed_points):
-    """Erstellt die Matplotlib-Figure für die Überlagerung (Visualisierung)."""
-    fig, ax = plt.subplots(figsize=(6, 6))
-
-    # Typologie Hintergrund
-    img_typ = cv2.imread(typ_path, cv2.IMREAD_GRAYSCALE)
-    img_typ = cv2.erode(
-        img_typ, np.ones((3, 3), np.uint8)
-    )  # Dicker machen für Sichtbarkeit
-    ax.imshow(img_typ, cmap="gray", origin="upper", alpha=0.5)
-
-    # Punkte einfärben nach Distanz (Qualität des Matches)
-    points_int = np.rint(transformed_points).astype(int)
-    h, w = dist_map.shape
-    dists = []
-
-    for p in points_int:
-        x, y = p
-        val = (
-            dist_map[y, x] if 0 <= x < w and 0 <= y < h else 50
-        )  # Hohe Strafe wenn außerhalb
-        dists.append(val)
-
-    sc = ax.scatter(
-        transformed_points[:, 0],
-        transformed_points[:, 1],
-        c=dists,
-        cmap="RdYlGn_r",  # Grün = gut (geringe Distanz), Rot = schlecht
-        edgecolors="none",
-        s=15,
-        vmin=0,
-        vmax=30,
-    )
-
-    ax.axis("off")
-    plt.tight_layout()
-    return fig
+        st.image(overlay, width="stretch")
 
 
 # --- SIDEBAR ---
+
+config = get_cached_config()
+config_paths = config["paths"]
+config_ransac = config["parameters"]["ransac"]
+config_icp = config["parameters"]["icp"]
+
 with st.sidebar:
-    st.title("🏺 Keramik Klassifizierer")
-    st.markdown("---")
-    st.header("1. Upload")
-    uploaded_file = st.file_uploader(
-        "Scherbe hochladen (Bild)", type=["png", "jpg", "jpeg"]
+
+    st.title("⚙️ Configuration")
+    st.caption(
+        "Configure the core parameters of the pipeline below, but proceed with caution. "
+        "Adjusting the RANSAC and ICP settings will directly impact convergence."
     )
 
-    st.markdown("---")
-    st.info(
-        """
-        **Funktionsweise:**
-        Das System extrahiert die Kontur der Scherbe und versucht, 
-        sie geometrisch (RANSAC + Chamfer Distance) in die Typenkataloge einzupassen.
-        """
-    )
+    form = st.form("settings", border=False)
 
-# --- MAINPAGE ---
-st.title("Typenbestimmung: Geometrisches Matching")
+    with form.expander("File Config", expanded=True):
 
-# Datenbank laden
-typology_db = load_typology_db()
-
-if uploaded_file is not None:
-    # Originalbild anzeigen
-    input_image = Image.open(uploaded_file)
-
-    st.write("Verarbeite Bild...")
-    progress_bar = st.progress(0)
-
-    # 1. Preprocessing
-    profile_path, profile_img_cv = preprocess_uploaded_image(uploaded_file)
-
-    if profile_path is None:
-        st.error(
-            "Konnte keine klare Kontur auf dem Bild finden. Bitte versuchen Sie ein Bild mit besserem Kontrast."
+        config_paths["typology_clean"] = st.text_input(
+            "Typology Path",
+            value=config_paths["typology_clean"],
+            help="Path to the clean typology dataset."
         )
-    else:
-        # Punkte für den Solver laden
-        points_shard = utils.get_points(
-            profile_path, step=3
-        )  # step=3 für Geschwindigkeit
 
-        progress_bar.progress(10)
+    with form.expander("General Algorithm", expanded=True):
 
-        # 2. Matching Loop
-        results = []
-        total_types = len(typology_db)
+        config["parameters"]["top_k"] = st.slider(
+            label="Top-K Matches",
+            min_value=1,
+            max_value=5,
+            value=config["parameters"]["top_k"],
+        )
 
-        # Iteration über alle Typen in der DB
-        for i, (name, data) in enumerate(typology_db.items()):
-            # Der Solver berechnet Score und Transformation
-            score, params = solver.solve_matching(
-                points_shard,
-                data["points"],
-                data["dist_map"],
-                iterations=2000,  # Reduziert für schnellere UI-Response (Default war 10000)
-            )
+        config_ransac["squared_dist_map"] = st.checkbox(
+            label="Use Squared Distance Map",
+            value=config_ransac["squared_dist_map"],
+        )
 
-            results.append(
-                {
-                    "type": data["display_name"],
-                    "score": score,  # Chamfer Distance: Kleiner ist besser (0 ist perfekt)
-                    "params": params,
-                    "typ_data": data,
-                }
-            )
+        config["parameters"]["drop_bottom"] = st.checkbox(
+            label="Drop Bottom of Shard",
+            value=config["parameters"]["drop_bottom"],
+        )
 
-            # Progress Update
-            if i % 5 == 0:
-                progress_bar.progress(10 + int((i / total_types) * 80))
+    with form.expander("RANSAC Parameters", expanded=True):
 
-        progress_bar.progress(100)
+        st.caption(
+            "Set boundaries for sampling, scaling, and rotation to balance alignment  "
+            "precision against computation time.",
+        )
 
-        # Sortieren: Score aufsteigend (niedriger Score = besseres Match)
-        results.sort(key=lambda x: x["score"])
-        top_match = results[0]
+        config_ransac["iterations"] = st.number_input(
+            label="Iterations",
+            min_value=1000,
+            max_value=100000,
+            value=config_ransac["iterations"],
+        )
 
-        # --- ERGEBNISSE ANZEIGEN ---
-        st.subheader("📊 Analyseergebnisse")
-
-        col1, col2 = st.columns([1, 2])
-
+        col1, col2 = st.columns(2)
         with col1:
-            st.image(input_image, caption="Originalaufnahme", width=300)
-            # Optional: Das extrahierte Profil anzeigen zur Kontrolle
-            st.image(
-                profile_img_cv,
-                caption="Extrahiertes Profil (Input für KI)",
-                width=300,
-                clamp=True,
+            config_ransac["min_scale"] = st.slider(
+                label="Min Scale",
+                min_value=0.1,
+                max_value=1.5,
+                value=config_ransac["min_scale"],
             )
-
         with col2:
-            # Score in "Konfidenz" umrechnen (nur grobe Schätzung für UI)
-            # Chamfer Score < 1.0 ist sehr gut, > 10 ist schlecht.
-            score_disp = top_match["score"]
-            confidence_color = (
-                "green" if score_disp < 5 else "orange" if score_disp < 15 else "red"
+            config_ransac["max_scale"] = st.slider(
+                label="Max Scale",
+                min_value=config_ransac["min_scale"],
+                max_value=2.0,
+                value=config_ransac["max_scale"],
             )
 
-            st.markdown(f"### Top Treffer: :{confidence_color}[{top_match['type']}]")
-            st.caption(f"Chamfer Score: {score_disp:.4f} (niedriger ist besser)")
-
-            with st.expander("Zeige Top 5 Kandidaten", expanded=True):
-                for i, res in enumerate(results[:5]):
-                    st.write(f"**#{i+1} {res['type']}** (Score: {res['score']:.2f})")
-
-        st.markdown("---")
-        st.subheader("Visuelle Validierung (Geometrischer Fit)")
-
-        # Visualisierung des Top-Matches generieren
-        best_typ_data = top_match["typ_data"]
-        best_params = top_match["params"]
-
-        # Transformation auf die Scherben-Punkte anwenden
-        # Wir laden die Punkte nochmal mit step=1 für schönere Grafik
-        points_shard_high_res = utils.get_points(profile_path, step=1)
-        transformed_points = solver.apply_transformation(
-            points_shard_high_res, *best_params
+        config_ransac["max_rotation_deg"] = st.slider(
+            label="Max Rotation (°)",
+            min_value=0,
+            max_value=15,
+            value=config_ransac["max_rotation_deg"],
         )
 
-        # Plot erstellen
-        fig = create_heatmap_figure(
-            best_typ_data["path"], best_typ_data["dist_map"], transformed_points
+    with form.expander("ICP Parameters", expanded=True):
+
+        st.caption(
+            "Control the fine-alignment refinement steps and strictness of the "
+            "convergence thresholds."
         )
 
-        st.pyplot(fig)
-        st.info(
-            "Grüne Punkte liegen exakt auf der Referenzlinie. Rote Punkte weichen ab."
+        config_icp["max_iterations"] = st.slider(
+            label="Maximum Iterations",
+            min_value=50,
+            max_value=200,
+            value=config_icp["max_iterations"],
         )
 
-        # Aufräumen der temporären Datei
-        if os.path.exists(profile_path):
-            os.remove(profile_path)
+        config_icp["tolerance"] = st.number_input(
+            label="Tolerance",
+            min_value=1e-7,
+            max_value=1e-4,
+            value=float(config_icp["tolerance"]),
+            step=1e-7,
+            format="%.7f",
+        )
 
-else:
-    st.info(
-        "👋 Willkommen! Bitte laden Sie ein Bild einer Scherbe hoch (Profilansicht oder Zeichnung), um das geometrische Matching zu starten."
-    )
+    # todo: save config.yml to disk?
+
+    submitted = form.form_submit_button("Apply Settings", type="primary", use_container_width=True)
+    form.caption("Hint: Applying settings will re-run the algorithm using the uploaded shard.")
+
+    if submitted:
+        st.toast("Settings updated!", icon="✅")
+
+# --- MAIN PAGE ---
+
+st.title("Keramik Challenge 🏺")
+st.caption("Upload a shard profile to find the closest matches in the typology database.")
+
+user_file = st.file_uploader("Upload a shard:", type="svg")
+
+if not user_file:
+    # todo: add a welcome message
+    st.stop()
+
+typology_data = get_cached_typology_data(config)
+profile = preprocess_shard(user_file)
+
+with st.spinner("Finding best matches..."):
+    top_matches = get_cached_top_matches(profile, typology_data, config)
+
+st.subheader("Top Matching Typologies")
+
+tab_titles = [f"#{i+1}: {match['name']}" for i, match in enumerate(top_matches)]
+tabs = st.tabs(tab_titles)
+
+for i, tab in enumerate(tabs):
+    with tab:
+        match = top_matches[i]
+        render_match_tab(match, i, typology_data)
