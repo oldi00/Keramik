@@ -70,7 +70,7 @@ def create_dir(path: Path, force: bool = False) -> None:
 
 def get_points(img: np.ndarray, step=5) -> np.ndarray:
     """
-    Extract points from black pixels in the image, downsampled for speed.
+    Extract points using contours from black pixels in the image, downsampled for speed.
 
     Args:
         img (np.ndarray): Grayscale image (White background, Black lines).
@@ -80,13 +80,20 @@ def get_points(img: np.ndarray, step=5) -> np.ndarray:
         np.ndarray: List of (x, y) coordinates with shape (N, 2).
     """
 
-    img_inv = cv2.bitwise_not(img)
+    # Threshold and invert the image so black lines become white shapes (required by findContours)
+    _, binary_img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY_INV)
 
-    points = cv2.findNonZero(img_inv)
-    points = points.reshape(-1, 2)
+    # Find contours (RETR_LIST gets all contours, CHAIN_APPROX_NONE keeps all boundary points)
+    contours, _ = cv2.findContours(binary_img, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
 
-    # Choose only every n-th point. This keeps the shape, but
-    # reduces the necessary computational resources later.
+    # Handle the edge case where no contours are found
+    if not contours:
+        return np.empty((0, 2), dtype=int)
+
+    # Concatenate all contour points into a single array and flatten the extra dimension
+    points = np.vstack(contours).reshape(-1, 2)
+
+    # Downsample the points for computational efficiency
     points = points[::step]
 
     return points

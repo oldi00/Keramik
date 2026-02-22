@@ -150,7 +150,7 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
 
         top_matches.append({
             "name": typology_name,
-            "points_shard": points_shard,
+            "shard_img": shard_img,
             "ransac_score": candidate["score"],
             "ransac_params": ransac_params,
             "icp_error": mean_icp_error,

@@ -8,8 +8,9 @@ Use the below command to start the app:
 from src.solver import load_typology_data, find_top_matches
 from src.preprocess import preprocess_shard
 from src.visuals import get_match_overlay
-from src.utils import load_config, apply_transformation
+from src.utils import load_config, apply_transformation, get_points
 import streamlit as st
+import cv2
 
 st.set_page_config(page_title="Keramik Challenge", layout="wide")
 
@@ -64,19 +65,19 @@ def render_match_tab(match, i, typology_data):
 
     with col1:
 
-        points_shard = match["points_shard"]
-        typ_name = match["name"]
+        shard_img = match["shard_img"]
+        shard_points = get_points(shard_img, step=1)
 
+        if show_ransac:
+            shard_points = apply_transformation(shard_points, *match["ransac_params"])
+        else:
+            shard_points = apply_transformation(shard_points, *match["icp_params"])
+
+        typ_name = match["name"]
         typ_path = typology_data[typ_name]["path"]
         dist_map = typology_data[typ_name]["dist_map"]
 
-        if not show_ransac:
-            icp_points = apply_transformation(points_shard, *match["icp_params"])
-            overlay = get_cached_overlay(typ_path, dist_map, icp_points)
-        else:
-            # todo: add ransac legend?
-            ransac_points = apply_transformation(points_shard, *match["ransac_params"])
-            overlay = get_cached_overlay(typ_path, dist_map, ransac_points)
+        overlay = get_match_overlay(typ_path, dist_map, shard_points)
 
         st.image(overlay, width="stretch")
 

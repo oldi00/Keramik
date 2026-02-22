@@ -1,37 +1,47 @@
-from matplotlib import pyplot as plt
 import io
-import numpy as np
 import cv2
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib.collections import LineCollection
+import matplotlib.colors as mcolors
 
 
 def get_match_overlay(typ_path, dist_map, points):
 
+    """Generates a PNG byte buffer overlaying a color-coded distance path on a grayscale image."""
     fig, ax = plt.subplots(figsize=(8, 8), dpi=150)
 
     img = cv2.imread(typ_path, cv2.IMREAD_GRAYSCALE)
     ax.imshow(img, cmap="gray", alpha=0.6)
 
     h, w = dist_map.shape
+    x, y = np.rint(points).astype(int).T
 
-    points_int = np.rint(points).astype(int)
-    dists = []
-    for p in points_int:
-        x, y = p
-        val = dist_map[y, x] if 0 <= x < w and 0 <= y < h else 50
-        dists.append(val)
+    # Fallback to a distance of 50 for out-of-bounds coordinates to prevent indexing crashes.
+    valid_mask = (x >= 0) & (x < w) & (y >= 0) & (y < h)
+    dists_np = np.full(len(points), 50.0)
+    dists_np[valid_mask] = dist_map[y[valid_mask], x[valid_mask]]
 
-    ax.scatter(
-        points[:, 0], points[:, 1],
-        c=dists, cmap='RdYlGn_r',
-        edgecolors='black',
-        linewidths=0.3,
-        vmin=0, vmax=30,
-        s=15,
-        alpha=0.9,
+    pts = points.reshape(-1, 1, 2)
+    segments = np.concatenate([pts[:-1], pts[1:]], axis=1)
+    segment_colors = (dists_np[:-1] + dists_np[1:]) / 2.0
+
+    outline = LineCollection(
+        segments, colors='black', linewidths=3, alpha=0.8,
+        capstyle='round', joinstyle='round'
     )
+    ax.add_collection(outline)
+
+    norm = mcolors.TwoSlopeNorm(vmin=0, vcenter=12, vmax=30)
+    lc = LineCollection(
+        segments, cmap='RdYlGn_r', norm=norm, linewidths=2,
+        capstyle='round', joinstyle='round'
+    )
+    lc.set_array(segment_colors)
+    lc.set_clim(0, 80)
+    ax.add_collection(lc)
 
     ax.axis('off')
-    fig.tight_layout()
 
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
