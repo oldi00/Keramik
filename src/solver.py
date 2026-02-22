@@ -4,8 +4,6 @@ from src.ransac import ransac
 from src.icp import icp
 import src.utils as utils
 from pathlib import Path
-from multiprocessing import Pool, cpu_count
-from functools import partial
 import pickle
 import logging
 import numpy as np
@@ -14,8 +12,12 @@ logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s",)
 logger = logging.getLogger(__name__)
 
 
-def build_typology_cache(typology_dir: str, cache_file: str) -> None:
+def build_typology_cache(config: dict) -> None:
     """Calculate points and distance map for all typology files and store them."""
+
+    typology_dir = config["paths"]["typology_clean"]
+    cache_file = config["paths"]["typology_cache"]
+    squared_dist_map = config["parameters"]["ransac"]["squared_dist_map"]
 
     Path(cache_file).parent.mkdir(parents=True, exist_ok=True)
 
@@ -35,11 +37,16 @@ def build_typology_cache(typology_dir: str, cache_file: str) -> None:
             "name": name_normalized,
             "path": str(path),
             "points": utils.get_points(img),
-            "dist_map": utils.get_dist_map(img)
+            "dist_map": utils.get_dist_map(img, squared_dist_map)
         }
 
+    cache_payload = {
+        "config": config,
+        "entries": cache
+    }
+
     with open(cache_file, "wb") as f:
-        pickle.dump(cache, f)
+        pickle.dump(cache_payload, f)
 
     logger.info(f"Successfully saved {len(cache)} entries to {cache_file}")
     return cache
@@ -60,11 +67,16 @@ def load_typology_data(config: dict) -> None:
 
     try:
         with open(cache_file, "rb") as f:
-            cached_data = pickle.load(f)
+            cached_payload = pickle.load(f)
     except (EOFError, pickle.UnpicklingError):
         logger.warning("Cache file is corrupted or empty. Rebuilding...")
         return build_typology_cache(typology_dir, cache_file)
 
+    if "config" not in cached_payload or cached_payload["config"] != config:
+        logger.info("Cache parameters changed or format is outdated. Rebuilding...")
+        return build_typology_cache(config)
+
+    cached_data = cached_payload["entries"]
     current_files = {p.name for p in Path(typology_dir).glob("*.png")}
     cached_files = {Path(item["path"]).name for item in cached_data.values()}
 
@@ -77,26 +89,8 @@ def load_typology_data(config: dict) -> None:
     return cached_data
 
 
-def match_single_entry(typology_entry: dict, points_shard: np.ndarray, config: dict) -> dict:
-    """Match a single shard against a single typology on a separate CPU core."""
-
-    score, params = ransac(
-        points_shard,
-        typology_entry["points"],
-        typology_entry["dist_map"],
-        config=config
-    )
-
-    return {
-        "name": utils.normalize_name(typology_entry["name"]),
-        "path": typology_entry["path"],
-        "score": score,
-        "params": params,
-    }
-
-
 def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = None):
-    """..."""
+    """Find the top typology matches for the given shard using RANSAC and ICP."""
 
     if config is None:
         config = utils.load_config()
@@ -108,17 +102,32 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
         typology_data = load_typology_data(config)
 
     points_shard = utils.get_points(shard_img)
+    if config["parameters"]["drop_bottom"]:
+        points_shard = utils.drop_bottom(points_shard)
 
-    num_cores = cpu_count()
-    worker_func = partial(match_single_entry, points_shard=points_shard, config=ransac_config)
+    # --- RANSAC ---
 
-    with Pool(processes=num_cores) as pool:
-        candidates = list(pool.imap(worker_func, typology_data.values()))
+    candidates = []
+    for typology_entry in typology_data.values():
+
+        score, params = ransac(
+            points_shard,
+            typology_entry["points"],
+            typology_entry["dist_map"],
+            config=ransac_config
+        )
+
+        candidates.append({
+            "name": utils.normalize_name(typology_entry["name"]),
+            "path": typology_entry["path"],
+            "score": score,
+            "params": params,
+        })
 
     candidates.sort(key=lambda x: x["score"])
+    candidates = candidates[:10]  # todo: integrate this parameter into config?
 
-    # todo: integrate this parameter into config?
-    candidates = candidates[:10]
+    # --- ICP ---
 
     top_matches = []
     for candidate in candidates:
@@ -141,9 +150,11 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
 
         top_matches.append({
             "name": typology_name,
+            "points_shard": points_shard,
             "ransac_score": candidate["score"],
+            "ransac_params": ransac_params,
             "icp_error": mean_icp_error,
-            "params": icp_params,
+            "icp_params": icp_params,
         })
 
     top_matches.sort(key=lambda x: x["icp_error"])

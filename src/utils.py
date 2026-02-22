@@ -108,11 +108,14 @@ def apply_transformation(points, scale, rotation, translation):
     return np.array([x, y]).T
 
 
-def get_dist_map(img: np.ndarray) -> np.ndarray:
+def get_dist_map(img: np.ndarray, squared: bool = False) -> np.ndarray:
     """Compute the distance map from an image."""
 
     _, binary_img = cv2.threshold(img, 127, 255, cv2.THRESH_BINARY)
     dist_map = cv2.distanceTransform(binary_img, cv2.DIST_L2, 5)
+
+    if squared:
+        dist_map = np.square(dist_map)
 
     return dist_map
 
@@ -179,3 +182,34 @@ def matrix_to_params(T):
     rotation = np.arctan2(T[1, 0], T[0, 0])
 
     return sx, rotation, (tx, ty)
+
+
+def drop_bottom(points: np.ndarray, drop_ratio: float = 0.10) -> np.ndarray:
+    """Drop the bottom points relative to the object's actual orientation."""
+
+    # 1. Center the points around the origin
+    mean = np.mean(points, axis=0)
+    centered = points - mean
+
+    # 2. Find the primary axis using a Covariance Matrix and Eigenvectors
+    cov_matrix = np.cov(centered.T)
+    eigenvalues, eigenvectors = np.linalg.eig(cov_matrix)
+
+    # The main axis is the eigenvector with the largest eigenvalue
+    main_axis = eigenvectors[:, np.argmax(eigenvalues)]
+
+    # Force the axis to point "downward" (positive Y) so we always chop the bottom
+    if main_axis[1] < 0:
+        main_axis = -main_axis
+
+    # 3. Project all points onto this main axis
+    # This gives us a 1D array of distances along the shard's length
+    projections = centered @ main_axis
+
+    # 4. Find the cutoff threshold (e.g., the 90th percentile of the length)
+    cutoff_threshold = np.percentile(projections, 100 - (drop_ratio * 100))
+
+    # 5. Keep only the points that fall above the cutoff
+    mask = projections < cutoff_threshold
+
+    return points[mask]
