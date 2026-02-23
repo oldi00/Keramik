@@ -140,9 +140,8 @@ def find_top_matches(shard_img: np.ndarray, typology_data=None, config: dict = N
         final_T, distances, _ = icp(
             source_points=points_shard,
             target_points=points_typology,
+            config=icp_config,
             init_pose=init_pose,
-            max_iterations=icp_config["max_iterations"],
-            tolerance=icp_config["tolerance"],
         )
 
         mean_icp_error = np.mean(distances)

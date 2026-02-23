@@ -16,4 +16,8 @@ parameters:
     squared_dist_map: true
   icp:
     max_iterations: 100
-    tolerance: 1e-6
+    tolerance: 1.0e-6
+    delta_x: 3.0
+    delta_y: 1.0
+    delta_scale: 0.05  # Prozent
+    delta_rotation_deg: 4.0

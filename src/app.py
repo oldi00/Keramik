@@ -179,6 +179,36 @@ with st.sidebar:
             value=config_icp["max_iterations"],
         )
 
+        col1, col2 = st.columns(2)
+        with col1:
+            config_icp["delta_x"] = st.slider(
+                label="Delta X",
+                min_value=1.0,
+                max_value=10.0,
+                value=config_icp["delta_x"],
+            )
+        with col2:
+            config_icp["delta_y"] = st.slider(
+                label="Delta Y",
+                min_value=1.0,
+                max_value=10.0,
+                value=config_icp["delta_y"],
+            )
+
+        config_icp["delta_scale"] = st.slider(
+            label="Delta Scale",
+            min_value=0.0,
+            max_value=1.0,
+            value=config_icp["delta_scale"],
+        )
+
+        config_icp["delta_rotation_deg"] = st.slider(
+            label="Delta Rotation (°)",
+            min_value=0.0,
+            max_value=15.0,
+            value=config_icp["delta_rotation_deg"],
+        )
+
         config_icp["tolerance"] = st.number_input(
             label="Tolerance",
             min_value=1e-7,

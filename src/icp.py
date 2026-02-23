@@ -85,17 +85,14 @@ def objective_function(params, source_points, target_tree, minfun="rmsd"):
         return np.mean(dists)
 
 
-def icp(
-    source_points,
-    target_points,
-    init_pose=None,
-    max_iterations=100,
-    tolerance=1e-6,
-    delta_x=3.0,
-    delta_y=1.0,
-    delta_scale=0.05,  # In prozent
-    delta_rotation=0.07,  # In radiant -> 0.07 Rad == 4 Grad
-):
+def icp(source_points, target_points, config, init_pose=None):
+
+    max_iterations = config["max_iterations"]
+    tolerance = config["tolerance"]
+    delta_x = config["delta_x"]
+    delta_y = config["delta_y"]
+    delta_scale = np.deg2rad(config["delta_scale"])
+    delta_rotation = config["delta_rotation_deg"]
 
     target_tree = KDTree(target_points)
     if init_pose is not None:
