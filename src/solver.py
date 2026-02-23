@@ -83,7 +83,7 @@ def load_typology_data(config: dict) -> None:
     if current_files != cached_files:
         diff_count = len(current_files.symmetric_difference(cached_files))
         logger.info(f"Cache is stale ({diff_count} file difference detected). Rebuilding...")
-        return build_typology_cache(typology_dir, cache_file)
+        return build_typology_cache(config)
 
     logger.info(f"Cache is valid. Loaded {len(cached_data)} items.")
     return cached_data
