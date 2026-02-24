@@ -63,14 +63,14 @@ def load_typology_data(config: dict) -> None:
 
     if not Path(cache_file).exists():
         logger.info("Cache file not found. Triggering build...")
-        return build_typology_cache(typology_dir, cache_file)
+        return build_typology_cache(config)
 
     try:
         with open(cache_file, "rb") as f:
             cached_payload = pickle.load(f)
     except (EOFError, pickle.UnpicklingError):
         logger.warning("Cache file is corrupted or empty. Rebuilding...")
-        return build_typology_cache(typology_dir, cache_file)
+        return build_typology_cache(config)
 
     if "config" not in cached_payload or cached_payload["config"] != config:
         logger.info("Cache parameters changed or format is outdated. Rebuilding...")

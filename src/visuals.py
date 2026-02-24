@@ -7,11 +7,11 @@ import matplotlib.colors as mcolors
 
 
 def get_match_overlay(typ_path, dist_map, points):
-
     """Generates a PNG byte buffer overlaying a color-coded distance path on a grayscale image."""
     fig, ax = plt.subplots(figsize=(8, 8), dpi=150)
 
-    img = cv2.imread(typ_path, cv2.IMREAD_GRAYSCALE)
+    img_array = np.fromfile(typ_path, np.uint8)
+    img = cv2.imdecode(img_array, cv2.IMREAD_UNCHANGED)
     ax.imshow(img, cmap="gray", alpha=0.6)
 
     h, w = dist_map.shape
@@ -37,13 +37,13 @@ def get_match_overlay(typ_path, dist_map, points):
     )
     ax.add_collection(outline)
 
-    norm = mcolors.TwoSlopeNorm(vmin=0, vcenter=12, vmax=30)
+    norm = mcolors.TwoSlopeNorm(vmin=0, vcenter=50, vmax=100)
     lc = LineCollection(
         segments, cmap='RdYlGn_r', norm=norm, linewidths=2,
         capstyle='round', joinstyle='round'
     )
     lc.set_array(segment_colors)
-    lc.set_clim(0, 80)
+    # lc.set_clim(0, 80)
     ax.add_collection(lc)
 
     ax.axis('off')
