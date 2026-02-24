@@ -91,8 +91,8 @@ def icp(source_points, target_points, config, init_pose=None):
     tolerance = config["tolerance"]
     delta_x = config["delta_x"]
     delta_y = config["delta_y"]
-    delta_scale = np.deg2rad(config["delta_scale"])
-    delta_rotation = config["delta_rotation_deg"]
+    delta_scale = config["delta_scale"]
+    delta_rotation = np.deg2rad(config["delta_rotation_deg"])
 
     target_tree = KDTree(target_points)
     if init_pose is not None:
