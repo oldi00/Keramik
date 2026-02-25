@@ -74,9 +74,9 @@ Aus Datenschutzgründen ist der Datensatz nicht in diesem Repo enthalten. Das ge
 
 Folge dieser Anleitung, um die Daten lokal einzurichten:
 
-1. Download: Lade den Datensatz von Moodle herunter.
-2. Ordner erstellen: Stelle sicher, dass der Ordner `raw/` innerhalb des `data/` Verzeichnisses existiert.
-3. Entpacken: Entpacke bzw. kopiere alle Dateien aus dem Download direkt nach `data/raw/`.
+1. Download: Lade den Datensatz `Römische Keramik - Daten` von Moodle herunter.
+2. Ordner erstellen: Erstelle den Ordner `data/` im Hauptverzeichnis und den Unterordner `data/raw/`.
+3. Entpacken: Entpacke bzw. kopiere alle Dateien aus dem Download-Ordner `Datachallenge_Roemische-Keramik` direkt nach `data/raw/`.
 4. Aufräumen & Strukturieren:
     - Erstelle den Unterordner `data/raw/png/`.
     - Verschiebe alle Bilddateien, die nun lose in `data/raw/` liegen, in diesen neuen `png/` Ordner.
@@ -88,6 +88,15 @@ data/
 └── raw/
     ├── png/                <-- (Alle Bilder)
     └── ...                 <-- (Weitere Dateien aus dem Zip-Ordner)
+```
+
+## ⚙️ Preprocessing
+
+Bevor die Anwendung genutzt werden kann, müssen die Rohdaten verarbeitet und die Typology vorbereitet werden. Dieser Schritt extrahiert relevante Merkmale aus den Bildern und strukturiert die Daten für die Pipeline.
+
+Führe dazu das Preprocessing-Skript im Terminal aus:
+```Bash
+python src/preprocess.py
 ```
 
 ## 🚀 App starten

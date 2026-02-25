@@ -251,7 +251,7 @@ if not user_file:
         2. **Preprocess the Data:** You must generate the required distance maps and typology
         assets by running the terminal command:
         ```bash
-        python preprocess.py --only_typology
+        python src/preprocess.py --only_typology
 
         ```
 
