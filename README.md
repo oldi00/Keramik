@@ -70,9 +70,11 @@ Damit das Projekt deine lokalen Pfade kennt:
 ## 📦 Daten-Setup
 **WICHTIG: KEINE DATEN IN DAS REPOSITORY ÜBERTRAGEN.**
 
-Aus Datenschutzgründen ist der Datensatz nicht in diesem Repo enthalten. Das gesamte `data/`-Verzeichnis ist in der `.gitignore` so konfiguriert, dass absolut nichts davon von Git erfasst wird. Alle Daten bleiben rein lokal auf deinem Rechner. (Hinweis: Die Typology befindet sich mittlerweile in der Cloud und wird ebenfalls nicht mehr über Git verwaltet).
+Aus Datenschutzgründen ist der Datensatz nicht in diesem Repo enthalten. Das gesamte `data/`-Verzeichnis ist in der `.gitignore` so konfiguriert, dass absolut nichts davon von Git erfasst wird. Alle Daten bleiben rein lokal auf deinem Rechner. (Hinweis: Auch die Typology-Daten befinden sich in der Cloud und werden nicht über Git verwaltet).
 
 Folge dieser Anleitung, um die Daten lokal einzurichten:
+
+**Teil 1: Moodle-Daten (Scherben)**
 
 1. Download: Lade den Datensatz `Römische Keramik - Daten` von Moodle herunter.
 2. Ordner erstellen: Erstelle den Ordner `data/` im Hauptverzeichnis und den Unterordner `data/raw/`.
@@ -81,13 +83,22 @@ Folge dieser Anleitung, um die Daten lokal einzurichten:
     - Erstelle den Unterordner `data/raw/png/`.
     - Verschiebe alle Bilddateien, die nun lose in `data/raw/` liegen, in diesen neuen `png/` Ordner.
 
+**Teil 2: Typology-Daten (Hessenbox)**
+
+5. Download: Lade die Typology-Datenbank über den Link zur Hessenbox herunter.
+6. Einordnen: Entpacke die Datei und verschiebe den extrahierten Ordner `typology/` (mit seinen Unterordnern) direkt in `data/raw/`.
+
 Damit die Skripte einwandfrei funktionieren, muss deine lokale Datenstruktur danach exakt so aussehen:
 
-```text
+```Plaintext
 data/
 └── raw/
-    ├── png/                <-- (Alle Bilder)
-    └── ...                 <-- (Weitere Dateien aus dem Zip-Ordner)
+    ├── png/                    
+    ├── typology/               <-- (Die Daten aus der Hessenbox)
+    │   ├── handzeichnungen/
+    │   ├── auto_extrahiert/
+    │   └── ...
+    └── ...                     <-- (Weitere Dateien aus Moodle)
 ```
 
 ## ⚙️ Preprocessing

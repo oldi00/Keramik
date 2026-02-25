@@ -1,7 +1,7 @@
 paths:
   shards_raw: "data/raw/svg"
   shards_clean: "data/processed/shards"
-  typology_raw: ""  # Hier den absoluten Pfad zum Cloud-Ordner einfügen.
+  typology_raw: "data/raw/typology/handzeichnungen"  # Ändern um verschiedene Quellen zu testen.
   typology_clean: "data/processed/typology"
   typology_cache: "data/cache/typology_features.pkl"
 
