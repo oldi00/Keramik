@@ -98,6 +98,7 @@ with st.sidebar:
         "Configure the core parameters of the pipeline below, but proceed with caution. "
         "Adjusting the RANSAC and ICP settings will directly impact convergence."
     )
+    st.info("In order for these changes to take effect, you must click the apply button below.")
 
     form = st.form("settings", border=False)
 
@@ -231,14 +232,16 @@ with st.sidebar:
 st.title("Keramik Challenge 🏺")
 st.caption("Upload a shard profile to find the closest matches in the typology database.")
 
-user_file = st.file_uploader("Upload a shard:", type="svg")
+user_file = st.file_uploader("Upload an unprocessed shard in SVG format:", type="svg")
 
 if not user_file:
     st.markdown(
         """
         #### Quick Start Guide
-        This interactive tool allows you to upload an `.svg` profile of a ceramic shard and uses
+        This interactive tool allows you to upload an `.svg` image of a ceramic shard and uses
         RANSAC and ICP alignment algorithms to find its closest match in the typology database.
+        Please upload the shard image exactly as provided in the lecture, without any
+        modifications. The pipeline handles all preprocessing automatically.
 
         **Important Prerequisites:** For the pipeline to run successfully, please ensure you have
         completed the following steps:

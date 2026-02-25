@@ -13,11 +13,11 @@ parameters:
     min_scale: 0.5
     max_scale: 1.5
     max_rotation_deg: 8
-    squared_dist_map: true
+    squared_dist_map: false
   icp:
     max_iterations: 100
     tolerance: 1.0e-6
-    delta_x: 3.0
-    delta_y: 1.0
+    delta_x: 10.0
+    delta_y: 5.0
     delta_scale: 0.05  # Prozent
     delta_rotation_deg: 4.0

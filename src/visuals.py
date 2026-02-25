@@ -37,7 +37,7 @@ def get_match_overlay(typ_path, dist_map, points):
     )
     ax.add_collection(outline)
 
-    norm = mcolors.TwoSlopeNorm(vmin=0, vcenter=50, vmax=100)
+    norm = mcolors.TwoSlopeNorm(vmin=0, vcenter=5, vmax=17)
     lc = LineCollection(
         segments, cmap='RdYlGn_r', norm=norm, linewidths=2,
         capstyle='round', joinstyle='round'
