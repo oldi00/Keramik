@@ -116,13 +116,16 @@ Sobald das Setup abgeschlossen und die Daten eingerichtet sind, kannst du die An
 streamlit run src/app.py
 ```
 
-## 👥 Autoren & Kontakt
-Dieses Projekt wurde entwickelt von:
-- Markus Oldenburger
-- Miles Lenz (miles@lenz-be.de)
-- Fadi Mekdad
+## 🌟 Danksagung & Credits
+Ein besonderes Dankeschön geht an eine andere Projektgruppe, die uns den Ordner `handzeichnungen` (zu finden in der Hessenbox) zur Verfügung gestellt hat. Die Nutzung dieser Daten hat maßgeblich dazu beigetragen, die Performance und Genauigkeit unseres Algorithmus spürbar zu verbessern! :)
 
-Bei Fragen zum Projekt, zum Code oder zur Installation erreichst du uns per E-Mail.
+## 👥 Autoren & Contributions
+Dieses Projekt wurde im Rahmen der Challenge von folgendem Team bearbeitet:
+- Miles Lenz (s5368500@stud.uni-frankfurt.de): Fokus auf allgemeine Code-Infrastruktur, die Preprocessing-Pipeline, Implementierung des RANSAC-Algorithmus sowie die finale Überarbeitung und das Refactoring der Streamlit-App.
+- Markus Oldenburger (s4742346@stud.uni-frankfurt.de): Vollständiger Fokus und Implementierung des ICP-Algorithmus, initiales Design der Streamlit-App sowie Forschung und Prototyping eines Siamesischen Netzwerks (Ansatz siehe `archive/`).
+- Fadi Mekdad: Automatisierte Extraktion von Typologien aus der Literatur (Code aktuell extern verwaltet und nicht in diesem Repository abgebildet).
+
+Bei Fragen zum Projekt, zum Code oder zur Installation erreicht ihr uns gerne per E-Mail.
 
 ## 📄 Lizenz
 Dieses Projekt steht unter der MIT License.
